@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db.models import Project, Scene
-from app.schemas.project import ProjectCreate, ProjectResponse
+from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
@@ -82,6 +82,33 @@ def seed_demo_project(db: Session = Depends(get_db)):
     db.refresh(project)
     get_or_create_project_settings(db, project.id)
     return project
+
+@router.put("/{project_id}", response_model=ProjectResponse)
+def rename_project(
+    project_id: str,
+    project_in: ProjectUpdate,
+    db: Session = Depends(get_db)
+):
+    """Renames an existing screenplay project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID '{project_id}' not found."
+        )
+
+    clean_title = project_in.title.strip()
+    if not clean_title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project title cannot be empty."
+        )
+
+    project.title = clean_title
+    db.commit()
+    db.refresh(project)
+    return project
+
 
 @router.delete("/{project_id}", status_code=status.HTTP_200_OK)
 def delete_project_by_id(project_id: str, db: Session = Depends(get_db)):

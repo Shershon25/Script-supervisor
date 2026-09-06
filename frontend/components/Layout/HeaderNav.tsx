@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project } from '@/lib/api';
 
-import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Trash2, Square } from 'lucide-react';
+import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Trash2, Square, Pencil } from 'lucide-react';
 import ImportScreenplayModal from '@/components/Import/ImportScreenplayModal';
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   activeProject: Project | null;
   onSelectProject: (proj: Project) => void;
   onCreateProject: (title: string) => Promise<void>;
+  onRenameProject?: (projectId: string, newTitle: string) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onLoadDemoProject?: () => Promise<void>;
   onImportSuccess?: () => void;
@@ -36,6 +37,7 @@ export default function HeaderNav({
   activeProject,
   onSelectProject,
   onCreateProject,
+  onRenameProject,
   onDeleteProject,
   onLoadDemoProject,
   onImportSuccess,
@@ -60,6 +62,9 @@ export default function HeaderNav({
   const [showImportModal, setShowImportModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renaming, setRenaming] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState('');
   const [creating, setCreating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -96,6 +101,21 @@ export default function HeaderNav({
       console.error('Create project failed:', err);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectToRename || !renameTitle.trim() || !onRenameProject) return;
+    try {
+      setRenaming(true);
+      await onRenameProject(projectToRename.id, renameTitle.trim());
+      setProjectToRename(null);
+      setRenameTitle('');
+    } catch (err) {
+      console.error('Rename project failed:', err);
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -169,19 +189,35 @@ export default function HeaderNav({
                           <span className="truncate">{p.title}</span>
                           {isSelected && <Check className="w-3.5 h-3.5 text-secondary shrink-0 ml-1.5" />}
                         </button>
-                        {onDeleteProject && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setProjectToDelete(p);
-                              setDropdownOpen(false);
-                            }}
-                            className="p-1 rounded text-txtMuted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-60 group-hover:opacity-100 shrink-0"
-                            title={`Delete project "${p.title}"`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <div className="flex items-center space-x-0.5 shrink-0 opacity-60 group-hover:opacity-100">
+                          {onRenameProject && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProjectToRename(p);
+                                setRenameTitle(p.title);
+                                setDropdownOpen(false);
+                              }}
+                              className="p-1 rounded text-txtMuted hover:text-secondary hover:bg-secondary/10 transition-colors"
+                              title={`Rename project "${p.title}"`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteProject && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProjectToDelete(p);
+                                setDropdownOpen(false);
+                              }}
+                              className="p-1 rounded text-txtMuted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title={`Delete project "${p.title}"`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -200,6 +236,20 @@ export default function HeaderNav({
                   <Plus className="w-3.5 h-3.5" />
                   <span>New Project...</span>
                 </button>
+
+                {activeProject && onRenameProject && (
+                  <button
+                    onClick={() => {
+                      setProjectToRename(activeProject);
+                      setRenameTitle(activeProject.title);
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-secondary" />
+                    <span>Rename Project...</span>
+                  </button>
+                )}
 
                 {activeProject && (
                   <button
@@ -508,6 +558,66 @@ export default function HeaderNav({
               Delete Project
             </button>
           </div>
+        </div>
+      </div>,
+      document.body
+    )}
+
+    {/* Rename Project Modal */}
+    {projectToRename && mounted && createPortal(
+      <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in theme-${theme}`}>
+        <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 text-txtPrimary relative">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-secondary/10 border border-secondary/20 rounded-xl text-secondary shrink-0">
+                <Pencil className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-txtPrimary">Rename Project</h3>
+                <p className="text-xs text-txtSecondary mt-0.5">Enter a new title for this project.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setProjectToRename(null); setRenameTitle(''); }}
+              className="p-1 rounded-lg text-txtMuted hover:text-txtPrimary hover:bg-cardHover transition shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleRenameSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-txtSecondary mb-1.5">
+                Project Title
+              </label>
+              <input
+                type="text"
+                value={renameTitle}
+                onChange={(e) => setRenameTitle(e.target.value)}
+                placeholder="Enter new project title..."
+                autoFocus
+                className="w-full px-3.5 py-2 bg-panel border border-border rounded-xl text-txtPrimary text-xs focus:outline-none focus:border-secondary font-medium"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setProjectToRename(null); setRenameTitle(''); }}
+                className="px-4 py-2 bg-panel border border-border hover:bg-cardHover text-txtSecondary hover:text-txtPrimary rounded-xl text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!renameTitle.trim() || renaming}
+                className="px-5 py-2.5 bg-secondary hover:opacity-90 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md hover:shadow-lg disabled:opacity-50 shrink-0"
+              >
+                {renaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
+                Save Title
+              </button>
+            </div>
+          </form>
         </div>
       </div>,
       document.body

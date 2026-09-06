@@ -33,3 +33,21 @@ def test_delete_project(client):
     get_res = client.get(f"/api/projects/{project_id}")
     assert get_res.status_code == 404
 
+
+def test_rename_project(client):
+    # Create project
+    res = client.post("/api/projects", json={"title": "Original Project Name"})
+    assert res.status_code == 201
+    project_id = res.json()["id"]
+
+    # Rename project
+    rename_res = client.put(f"/api/projects/{project_id}", json={"title": "Renamed Project Title"})
+    assert rename_res.status_code == 200
+    assert rename_res.json()["title"] == "Renamed Project Title"
+
+    # Verify get returns updated title
+    get_res = client.get(f"/api/projects/{project_id}")
+    assert get_res.status_code == 200
+    assert get_res.json()["title"] == "Renamed Project Title"
+
+

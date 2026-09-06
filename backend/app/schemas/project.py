@@ -4,6 +4,9 @@ from pydantic import BaseModel, ConfigDict
 class ProjectCreate(BaseModel):
     title: str
 
+class ProjectUpdate(BaseModel):
+    title: str
+
 class ProjectResponse(BaseModel):
     id: str
     title: str

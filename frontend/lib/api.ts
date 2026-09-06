@@ -391,6 +391,15 @@ export async function deleteProject(id: string): Promise<{ status: string; messa
   return handleResponse<{ status: string; message: string }>(res);
 }
 
+export async function renameProject(id: string, title: string): Promise<Project> {
+  const res = await fetch(`${API_URL}/api/projects/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse<Project>(res);
+}
+
 export async function listScenes(projectId: string): Promise<Scene[]> {
   const res = await fetch(`${API_URL}/api/projects/${projectId}/scenes`);
   return handleResponse<Scene[]>(res);

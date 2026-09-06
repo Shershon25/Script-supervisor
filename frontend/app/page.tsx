@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Project, Scene, StoryStateResponse, IssueResponse,
-  listProjects, createProject, deleteProject, listScenes, getStoryState, listIssues, seedDemoProject,
+  listProjects, createProject, deleteProject, renameProject, listScenes, getStoryState, listIssues, seedDemoProject,
   analyzeScene, analyzeUnifiedScene, reviewIssue, updateSceneText
 } from '@/lib/api';
 import HeaderNav from '@/components/Layout/HeaderNav';
@@ -376,6 +376,19 @@ function HomeContent() {
     selectProject(proj);
   }
 
+  async function handleRenameProject(projectId: string, newTitle: string) {
+    try {
+      const updated = await renameProject(projectId, newTitle);
+      toast.success('Project Renamed', `Project renamed to "${updated.title}".`);
+      setProjects((prev) => prev.map((p) => (p.id === projectId ? updated : p)));
+      if (activeProject?.id === projectId) {
+        setActiveProject(updated);
+      }
+    } catch (err: any) {
+      toast.error('Rename Failed', err.message || 'Failed to rename project');
+    }
+  }
+
   async function handleDeleteProject(projectId: string) {
     try {
       await deleteProject(projectId);
@@ -409,6 +422,7 @@ function HomeContent() {
         activeProject={activeProject}
         onSelectProject={selectProject}
         onCreateProject={handleCreateProjectFromTitle}
+        onRenameProject={handleRenameProject}
         onDeleteProject={handleDeleteProject}
         onLoadDemoProject={handleLoadSampleProject}
         onImportSuccess={() => activeProject && loadProjectData(activeProject.id)}
