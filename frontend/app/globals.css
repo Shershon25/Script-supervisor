@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, ::before, ::after {
+    border-color: var(--border-color);
+  }
+}
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-courier: 'Courier Prime', monospace, typewriter;
+
+  /* Design Board Color Palette */
+  --color-primary: #1A1C20;     /* Rich Off-Black */
+  --color-secondary: #586274;   /* Slate Blue-Grey */
+  --color-tertiary: #C87D32;    /* Warm Amber / Ochre */
+  --color-neutral: #767673;     /* Mid Warm Grey */
+  --color-danger: #B82C2C;      /* Warm Deep Red */
+
+  /* Default Light Theme Variables (Matching Design Image) */
+  --bg-app: #EBE9E3;             /* Warm Outer Neutral Cream */
+  --bg-panel: #F3F2EC;           /* Container Surface */
+  --bg-card: #FAF9F5;            /* Card Container Surface */
+  --bg-card-hover: #E4E1D7;      /* Hover Surface State */
+  --bg-screenplay-page: #FFFFFF; /* Pure Paper White */
+  
+  --text-primary: #1A1C20;       /* Primary Text */
+  --text-secondary: #586274;     /* Secondary Text */
+  --text-muted: #767673;         /* Neutral Muted Text */
+  --text-screenplay: #1A1C20;    /* Screenplay Text */
+  
+  --border-color: #D8D4C8;       /* Subtle Warm Border */
+  --border-active: #586274;      /* Active Border */
+
+  --btn-primary-bg: #1A1C20;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #333740;
+  
+  --accent-tertiary: #C87D32;
+  --accent-slate: #586274;
+  --accent-dark: #1A1C20;
+  --highlight-amber: rgba(200, 125, 50, 0.2);
+  --highlight-cyan: rgba(88, 98, 116, 0.2);
+}
+
+.bg-primary {
+  background-color: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-text) !important;
+}
+.bg-primary:hover {
+  background-color: var(--btn-primary-hover) !important;
+}
+.hover\:bg-secondary:hover {
+  background-color: #586274;
+}
+.bg-secondary {
+  background-color: #586274;
+}
+.bg-tertiary {
+  background-color: #C87D32;
+}
+.bg-neutral {
+  background-color: #767673;
+}
+.bg-danger {
+  background-color: #B82C2C;
+}
+
+/* Light Theme (Identical to Default) */
+.theme-light {
+  --bg-app: #EBE9E3;
+  --bg-panel: #F3F2EC;
+  --bg-card: #FAF9F5;
+  --bg-card-hover: #E4E1D7;
+  --bg-screenplay-page: #FFFFFF;
+  
+  --text-primary: #1A1C20;
+  --text-secondary: #586274;
+  --text-muted: #767673;
+  --text-screenplay: #1A1C20;
+  
+  --border-color: #D8D4C8;
+  --border-active: #586274;
+
+  --btn-primary-bg: #1A1C20;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #333740;
+  
+  --accent-tertiary: #C87D32;
+  --accent-slate: #586274;
+  --accent-dark: #1A1C20;
+  --highlight-amber: rgba(200, 125, 50, 0.2);
+  --highlight-cyan: rgba(88, 98, 116, 0.2);
+}
+
+/* Dark Theme Variables */
+.theme-dark {
+  --bg-app: #121417;
+  --bg-panel: #1A1C20;
+  --bg-card: #23262D;
+  --bg-card-hover: #2D313A;
+  --bg-screenplay-page: #1A1C20;
+  
+  --text-primary: #FAF9F5;
+  --text-secondary: #9EA6B5;
+  --text-muted: #8E929B;
+  --text-screenplay: #FAF9F5;
+  
+  --border-color: rgba(255, 255, 255, 0.15);
+  --border-active: #C87D32;
+
+  --btn-primary-bg: #C87D32; /* Warm Amber Pop in Dark Mode */
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-hover: #D88F44;
+  
+  --accent-tertiary: #C87D32;
+  --accent-slate: #586274;
+  --accent-dark: #1A1C20;
+  --highlight-amber: rgba(200, 125, 50, 0.3);
+  --highlight-cyan: rgba(88, 98, 116, 0.3);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Screenplay Typography Classes */
+.font-courier {
+  font-family: var(--font-courier);
+}
+
+.screenplay-paper {
+  font-family: var(--font-courier);
+  background-color: var(--bg-screenplay-page);
+  color: var(--text-screenplay);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.screenplay-slugline {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  margin-left: 0;
+  text-align: left;
+}
+
+.screenplay-character {
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 1.25rem;
+  margin-bottom: 0.15rem;
+  margin-left: 36%;
+  width: 28%;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.screenplay-parenthetical {
+  margin-left: 28%;
+  width: 44%;
+  font-style: italic;
+  text-align: left;
+  margin-bottom: 0.15rem;
+}
+
+.screenplay-dialogue {
+  margin-left: 22%;
+  width: 56%;
+  margin-bottom: 0.75rem;
+  text-align: left;
+}
+
+.screenplay-action {
+  margin-left: 0;
+  margin-bottom: 0.75rem;
+  text-align: left;
+}
+
+/* Inline Highlights */
+.highlight-knowledge-gap {
+  background-color: var(--highlight-amber);
+  border-bottom: 2px solid var(--accent-amber);
+  border-radius: 2px;
+  padding: 1px 3px;
+}
+
+.highlight-procedure-check {
+  background-color: var(--highlight-cyan);
+  border-bottom: 2px solid #06B6D4;
+  border-radius: 2px;
+  padding: 1px 3px;
+}
+
+/* Inline Prop Callout Card */
+.inline-prop-card {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 12px 0;
+  font-family: var(--font-sans);
+}
+
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
