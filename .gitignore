@@ -55,3 +55,8 @@ Thumbs.db
 Implementation plans/
 DEPLOYMENT.md
 deployment.md
+
+# Scratch Debug Scripts
+backend/test_*.py
+backend/debug_*.py
+backend/create_test_project.py
