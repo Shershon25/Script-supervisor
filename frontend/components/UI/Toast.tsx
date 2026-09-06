@@ -1,9 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastItem {
   id: string;
@@ -17,6 +17,7 @@ interface ToastContextValue {
   success: (title: string, message?: string) => void;
   error: (title: string, message?: string) => void;
   info: (title: string, message?: string) => void;
+  warning: (title: string, message?: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -42,9 +43,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const success = useCallback((title: string, message?: string) => showToast(title, message, 'success'), [showToast]);
   const error = useCallback((title: string, message?: string) => showToast(title, message, 'error'), [showToast]);
   const info = useCallback((title: string, message?: string) => showToast(title, message, 'info'), [showToast]);
+  const warning = useCallback((title: string, message?: string) => showToast(title, message, 'warning'), [showToast]);
 
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info }}>
+    <ToastContext.Provider value={{ showToast, success, error, info, warning }}>
       {children}
       {/* Floating Toast Notification Container */}
       <div className="fixed top-16 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none select-none">
@@ -56,11 +58,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ? 'bg-emerald-900/90 text-emerald-100 border-emerald-500/40'
                 : toast.type === 'error'
                 ? 'bg-rose-900/90 text-rose-100 border-rose-500/40'
+                : toast.type === 'warning'
+                ? 'bg-amber-900/90 text-amber-100 border-amber-500/40'
                 : 'bg-neutral-900/90 text-neutral-100 border-neutral-700'
             }`}
           >
             {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />}
             {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />}
+            {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
             {toast.type === 'info' && <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
 
             <div className="flex-1 min-w-0">
@@ -88,7 +93,8 @@ export const useToast = () => {
       showToast: () => {},
       success: () => {},
       error: () => {},
-      info: () => {}
+      info: () => {},
+      warning: () => {}
     };
   }
   return ctx;
