@@ -338,14 +338,14 @@ export default function HeaderNav({
         </button>
 
         {/* Analyze All Scenes / Stop Analysis Button */}
-        {analyzing && (batchProgress || onStopAnalysis) ? (
+        {analyzing && batchProgress ? (
           <button
             onClick={onStopAnalysis}
             className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold flex items-center space-x-1.5 transition-all text-[11px] animate-pulse cursor-pointer shadow-sm"
             title="Stop batch scene analysis midway"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
-            <span>Stop ({batchProgress ? `${batchProgress.current}/${batchProgress.total}` : 'Batch'})</span>
+            <span>Stop ({batchProgress.current}/{batchProgress.total})</span>
           </button>
         ) : (
           <button

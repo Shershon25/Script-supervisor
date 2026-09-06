@@ -234,8 +234,8 @@ function HomeContent() {
     }
     setAnalyzing(true);
     try {
-      // 1. Save scene text changes first
-      await analyzeScene(activeProject.id, currentScene.scene_number, currentScene.raw_text);
+      // 1. Save scene text changes first without triggering redundant legacy analysis
+      await updateSceneText(activeProject.id, currentScene.id, currentScene.raw_text);
       // 2. Trigger Unified Analysis Pipeline
       await analyzeUnifiedScene(activeProject.id, currentScene.id);
       // 3. Update analyzed text tracking hash
@@ -275,7 +275,7 @@ function HomeContent() {
           currentHeading: sc.raw_text.split('\n')[0] || `Scene ${sc.scene_number}`
         });
 
-        await analyzeScene(activeProject.id, sc.scene_number, sc.raw_text);
+        await updateSceneText(activeProject.id, sc.id, sc.raw_text);
         await analyzeUnifiedScene(activeProject.id, sc.id);
         setAnalyzedTextMap(prev => ({ ...prev, [sc.id]: sc.raw_text }));
         completedCount++;

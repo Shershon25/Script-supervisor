@@ -28,6 +28,9 @@ function getSuggestionText(issue: IssueResponse): string {
 
 export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Props) {
   const [submitting, setSubmitting] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [pendingAction, setPendingAction] = useState<{ action: 'ACCEPT' | 'IGNORE' | 'RESOLVE' | 'REOPEN'; resType?: string } | null>(null);
 
   const isKnowledge = issue.issue_type.includes('KNOWLEDGE');
   const isLocation = issue.issue_type.includes('LOCATION');
@@ -37,10 +40,32 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
 
   const confidencePct = Math.round(issue.confidence * 100);
 
-  const handleAction = async (action: 'ACCEPT' | 'IGNORE' | 'RESOLVE' | 'REOPEN', resType?: string) => {
+  const handleActionClick = (action: 'ACCEPT' | 'IGNORE' | 'RESOLVE' | 'REOPEN', resType?: string) => {
+    if (action === 'REOPEN') {
+      confirmAction(action, resType, '');
+      return;
+    }
+    setPendingAction({ action, resType });
+    setShowNoteInput(true);
+  };
+
+  const confirmAction = async (
+    action: 'ACCEPT' | 'IGNORE' | 'RESOLVE' | 'REOPEN',
+    resType?: string,
+    customNote?: string
+  ) => {
     setSubmitting(true);
     try {
-      await onReview(action, resType, `Writer decision for ${issue.title}`);
+      const finalNote = customNote !== undefined ? customNote.trim() : noteText.trim();
+      const defaultFallback = resType === 'INTENTIONAL' 
+        ? 'Intentional story decision' 
+        : resType === 'NEEDS_REVIEW' 
+        ? 'Deferred for later review' 
+        : 'Resolved continuity issue';
+      await onReview(action, resType, finalNote || defaultFallback);
+      setShowNoteInput(false);
+      setNoteText('');
+      setPendingAction(null);
     } finally {
       setSubmitting(false);
     }
@@ -175,38 +200,83 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
         {getSuggestionText(issue)}
       </div>
 
+      {/* Persistent Saved Writer Note Display */}
+      {isResolved && issue.resolution_note && (
+        <div className="p-2.5 rounded-lg bg-card/90 border border-emerald-500/30 text-xs font-mono shadow-sm space-y-0.5">
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+            ✍️ WRITER NOTE:
+          </span>
+          <p className="text-txtPrimary italic font-medium">"{issue.resolution_note}"</p>
+        </div>
+      )}
+
       {/* Resolve Finding Actions */}
       {!isResolved ? (
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-2 pt-1">
           <span className="text-[10px] font-bold text-txtMuted uppercase tracking-wider block">
             Resolve Finding:
           </span>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleAction('ACCEPT', 'INTENTIONAL')}
-              disabled={submitting}
-              className="py-1.5 px-2 rounded-lg bg-cardHover border border-secondary/40 text-secondary hover:bg-secondary/20 font-bold text-xs transition-all disabled:opacity-50"
-              title="Mark as an intentional writer story decision"
-            >
-              Intentional
-            </button>
-            <button
-              onClick={() => handleAction('IGNORE', 'NEEDS_REVIEW')}
-              disabled={submitting}
-              className="py-1.5 px-2 rounded-lg bg-cardHover border border-tertiary/40 text-tertiary hover:bg-tertiary/20 font-bold text-xs transition-all disabled:opacity-50"
-              title="Snooze issue to review later"
-            >
-              Fix Later
-            </button>
-            <button
-              onClick={() => handleAction('RESOLVE', 'FIXED')}
-              disabled={submitting}
-              className="py-1.5 px-2 rounded-lg bg-primary hover:opacity-90 text-white font-bold text-xs transition-all shadow-md disabled:opacity-50"
-              title="Mark issue as fixed"
-            >
-              Resolve
-            </button>
-          </div>
+
+          {!showNoteInput ? (
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleActionClick('ACCEPT', 'INTENTIONAL')}
+                disabled={submitting}
+                className="py-1.5 px-2 rounded-lg bg-cardHover border border-secondary/40 text-secondary hover:bg-secondary/20 font-bold text-xs transition-all disabled:opacity-50"
+                title="Mark as an intentional writer story decision"
+              >
+                Intentional
+              </button>
+              <button
+                onClick={() => handleActionClick('IGNORE', 'NEEDS_REVIEW')}
+                disabled={submitting}
+                className="py-1.5 px-2 rounded-lg bg-cardHover border border-tertiary/40 text-tertiary hover:bg-tertiary/20 font-bold text-xs transition-all disabled:opacity-50"
+                title="Snooze issue to review later"
+              >
+                Fix Later
+              </button>
+              <button
+                onClick={() => handleActionClick('RESOLVE', 'FIXED')}
+                disabled={submitting}
+                className="py-1.5 px-2 rounded-lg bg-primary hover:opacity-90 text-white font-bold text-xs transition-all shadow-md disabled:opacity-50"
+                title="Mark issue as fixed"
+              >
+                Resolve
+              </button>
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-card border border-secondary/40 space-y-2.5 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-secondary uppercase font-mono">
+                  Add Note ({pendingAction?.resType || pendingAction?.action}):
+                </span>
+                <button
+                  onClick={() => { setShowNoteInput(false); setPendingAction(null); }}
+                  className="text-[10px] text-txtMuted hover:text-txtPrimary font-bold"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Optional writer note (e.g., Mom knows Maddie's habit from off-screen family backstory)..."
+                rows={2}
+                className="w-full p-2 rounded bg-cardHover border border-border text-txtPrimary text-xs focus:outline-none focus:border-secondary resize-none font-sans"
+              />
+
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => pendingAction && confirmAction(pendingAction.action, pendingAction.resType)}
+                  disabled={submitting}
+                  className="py-1 px-3 rounded-lg bg-secondary text-white font-bold text-xs hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
+                >
+                  {submitting ? 'Saving...' : 'Save & Confirm'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
@@ -215,7 +285,7 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
             <span>Marked {issue.status} ({issue.resolution_type || 'Reviewed'})</span>
           </div>
           <button
-            onClick={() => handleAction('REOPEN')}
+            onClick={() => handleActionClick('REOPEN')}
             disabled={submitting}
             className="text-[10px] font-bold text-txtMuted hover:text-txtPrimary underline font-mono"
           >
