@@ -1,0 +1,57 @@
+# Environment & Local Secrets
+.env
+.env*.local
+*.env
+!*.env.example
+!backend/.env.example
+*key*.json
+*credential*.json
+*secret*.json
+*.pem
+*.key
+secrets/
+
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js & Next.js Builds
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+.npm/
+next-env.d.ts
+
+# Databases & Local Data
+cockroach-data/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+logs/
+
+# Operating System & IDE Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Internal Specs & Deployment Specs
+Implementation plans/
+DEPLOYMENT.md
+deployment.md
