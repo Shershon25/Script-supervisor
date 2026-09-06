@@ -433,44 +433,61 @@ If NO → do not extract it.
 If YES → extract it with exact screenplay provenance.
 """
 
+_client_instance: Optional[Any] = None
+
+def get_genai_client() -> Any:
+    """
+    Returns a cached Google GenAI Client instance using Application Default Credentials (ADC) or API Key.
+    - Development mode (ENVIRONMENT=development): Uses local gcloud ADC (gcloud auth application-default login).
+    - Production mode (ENVIRONMENT=production): Uses Cloud Run attached service account ADC automatically.
+    - Developer API Mode (GEMINI_PROVIDER=developer): Uses GEMINI_API_KEY.
+
+    No hardcoded GOOGLE_APPLICATION_CREDENTIALS or JSON key files are used.
+    """
+    global _client_instance
+    if _client_instance is not None:
+        return _client_instance
+
+    from google import genai
+    provider = settings.GEMINI_PROVIDER.lower()
+
+    if provider == "vertexai":
+        # Ensure GOOGLE_APPLICATION_CREDENTIALS is removed from os.environ
+        # so Google ADC relies cleanly on gcloud ADC in development or attached Service Account on Cloud Run
+        if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
+            logger.info("Clearing GOOGLE_APPLICATION_CREDENTIALS environment variable to enforce pure Application Default Credentials (ADC).")
+            os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+
+        if settings.ENVIRONMENT.lower() == "development":
+            logger.info("Initializing Vertex AI Client singleton in DEVELOPMENT mode using local gcloud ADC.")
+        else:
+            logger.info("Initializing Vertex AI Client singleton in PRODUCTION mode using Cloud Run attached Service Account ADC.")
+
+        _client_instance = genai.Client(
+            vertexai=True,
+            project=settings.GCP_PROJECT_ID or None,
+            location=settings.GCP_LOCATION or "global"
+        )
+    else:
+        if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.strip().lower() in ("", "mock", "none", "your_gemini_api_key_here"):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Gemini API credentials not configured. Please configure GEMINI_API_KEY in .env."
+            )
+        _client_instance = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+    return _client_instance
+
+
 def analyze_scene(scene_text: str) -> SceneAnalysisResponse:
     """Analyzes raw screenplay text using Gemini API via Vertex AI or Developer API."""
     provider = settings.GEMINI_PROVIDER.lower()
-    is_vertex = (provider == "vertexai")
-
-    if not is_vertex and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.strip().lower() in ("", "mock", "none", "your_gemini_api_key_here")):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API credentials not configured. Please configure GEMINI_API_KEY in .env."
-        )
 
     try:
         from google import genai
         from google.genai import types
 
-        key_path = None
-        if settings.GOOGLE_APPLICATION_CREDENTIALS and settings.GOOGLE_APPLICATION_CREDENTIALS.strip():
-            key_path = Path(settings.GOOGLE_APPLICATION_CREDENTIALS.strip())
-            if not key_path.is_absolute():
-                key_path = ROOT_DIR / key_path
-            if key_path.exists():
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(key_path)
-
-        if is_vertex:
-            if key_path and key_path.exists():
-                try:
-                    from google.oauth2 import service_account
-                    creds = service_account.Credentials.from_service_account_file(
-                        str(key_path),
-                        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                    )
-                    client = genai.Client(vertexai=True, credentials=creds, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-                except Exception:
-                    client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-            else:
-                client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-        else:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = get_genai_client()
 
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
@@ -519,41 +536,12 @@ def evaluate_continuity_candidates(
         return GeminiContinuityResponse(evaluations=[])
 
     provider = settings.GEMINI_PROVIDER.lower()
-    is_vertex = (provider == "vertexai")
-
-    if not is_vertex and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.strip().lower() in ("", "mock", "none", "your_gemini_api_key_here")):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API credentials not configured. Please configure GEMINI_API_KEY in .env."
-        )
 
     try:
         from google import genai
         from google.genai import types
 
-        key_path = None
-        if settings.GOOGLE_APPLICATION_CREDENTIALS and settings.GOOGLE_APPLICATION_CREDENTIALS.strip():
-            key_path = Path(settings.GOOGLE_APPLICATION_CREDENTIALS.strip())
-            if not key_path.is_absolute():
-                key_path = ROOT_DIR / key_path
-            if key_path.exists():
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(key_path)
-
-        if is_vertex:
-            if key_path and key_path.exists():
-                try:
-                    from google.oauth2 import service_account
-                    creds = service_account.Credentials.from_service_account_file(
-                        str(key_path),
-                        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                    )
-                    client = genai.Client(vertexai=True, credentials=creds, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-                except Exception:
-                    client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-            else:
-                client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-        else:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = get_genai_client()
 
         candidates_payload = [c.model_dump() for c in candidates]
         user_prompt = f"PROJECT CONTINUITY STRICTNESS LEVEL: {continuity_strictness} / 10\n\nRELEVANT HISTORICAL CONTEXT & STORY WORLD RULES:\n<UNTRUSTED_STORY_CONTEXT>\n{context_str}\n</UNTRUSTED_STORY_CONTEXT>\n\nNEW SCENE TEXT:\n<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>\n\nCANDIDATE CONFLICTS TO EVALUATE:\n{json.dumps(candidates_payload, indent=2)}"
@@ -595,41 +583,12 @@ def evaluate_continuity_candidates(
 def extract_plot_timeline(scene_number: int, scene_text: str, previous_events_summary: str = "") -> PlotTimelineResponse:
     """Extracts major plot and subplot narrative events from a screenplay scene using Gemini."""
     provider = settings.GEMINI_PROVIDER.lower()
-    is_vertex = (provider == "vertexai")
-
-    if not is_vertex and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.strip().lower() in ("", "mock", "none", "your_gemini_api_key_here")):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API credentials not configured. Please configure GEMINI_API_KEY in .env."
-        )
 
     try:
         from google import genai
         from google.genai import types
 
-        key_path = None
-        if settings.GOOGLE_APPLICATION_CREDENTIALS and settings.GOOGLE_APPLICATION_CREDENTIALS.strip():
-            key_path = Path(settings.GOOGLE_APPLICATION_CREDENTIALS.strip())
-            if not key_path.is_absolute():
-                key_path = ROOT_DIR / key_path
-            if key_path.exists():
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(key_path)
-
-        if is_vertex:
-            if key_path and key_path.exists():
-                try:
-                    from google.oauth2 import service_account
-                    creds = service_account.Credentials.from_service_account_file(
-                        str(key_path),
-                        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                    )
-                    client = genai.Client(vertexai=True, credentials=creds, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-                except Exception:
-                    client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-            else:
-                client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-        else:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = get_genai_client()
 
         user_prompt = f"SCENE NUMBER: {scene_number}\n\nPREVIOUSLY EXTRACTED PLOT EVENTS (for connection referencing):\n{previous_events_summary}\n\nSCREENPLAY SCENE TEXT:\n<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>"
 

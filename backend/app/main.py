@@ -92,6 +92,12 @@ app.include_router(settings_api.router)
 app.include_router(documents.router)
 
 
+@app.get("/")
+@app.get("/health")
+def root_health_check():
+    return {"status": "ok", "service": "Script Supervisor API"}
+
+
 @app.on_event("startup")
 def startup_event():
     logger.info("Initializing database tables & schema migrations...")

@@ -14,10 +14,9 @@ class Settings(BaseSettings):
     # Gemini Mode: 'vertexai' or 'developer'
     GEMINI_PROVIDER: str = "developer"
     
-    # Google Cloud Vertex AI settings
+    # Google Cloud Vertex AI settings (Uses Application Default Credentials / ADC)
     GCP_PROJECT_ID: str = ""
     GCP_LOCATION: str = "global"
-    GOOGLE_APPLICATION_CREDENTIALS: str = ""  # Path to Service Account JSON key
     
     # Gemini Developer API settings
     GEMINI_API_KEY: str = ""

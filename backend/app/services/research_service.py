@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 
 from app.db.models import Claim, ResearchTask, ResearchResult, ResearchEvaluation, Scene, Project
 from app.services.parallel import execute_parallel_search, ParallelSource
-from app.services.gemini import settings, ROOT_DIR, Path, os
+from app.services.gemini import settings, ROOT_DIR, Path, os, get_genai_client
 from app.schemas.claim import ClaimExtraction, ClaimResponse
 from app.schemas.research import ResearchTaskResponse, ResearchSourceResponse, ResearchEvaluationResponse
 
@@ -292,28 +292,7 @@ def evaluate_evidence_gemini(claim_text: str, sources: List[ResearchResult]) -> 
         from google import genai
         from google.genai import types
 
-        key_path = None
-        if settings.GOOGLE_APPLICATION_CREDENTIALS and settings.GOOGLE_APPLICATION_CREDENTIALS.strip():
-            key_path = Path(settings.GOOGLE_APPLICATION_CREDENTIALS.strip())
-            if not key_path.is_absolute():
-                key_path = ROOT_DIR / key_path
-            if key_path.exists():
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(key_path)
-
-        if is_vertex:
-            if key_path and key_path.exists():
-                try:
-                    from google.oauth2 import service_account
-                    creds = service_account.Credentials.from_service_account_file(
-                        str(key_path), scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                    )
-                    client = genai.Client(vertexai=True, credentials=creds, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-                except Exception:
-                    client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-            else:
-                client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-        else:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = get_genai_client()
 
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -352,40 +331,12 @@ def evaluate_evidence_gemini(claim_text: str, sources: List[ResearchResult]) -> 
 def extract_claims_from_scene(scene_text: str) -> List[ClaimExtraction]:
     """Extracts claims using Gemini API."""
     provider = settings.GEMINI_PROVIDER.lower()
-    is_vertex = (provider == "vertexai")
-
-    if not is_vertex and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.strip().lower() in ("", "mock", "none", "your_gemini_api_key_here")):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Gemini API credentials not configured. Please set GEMINI_API_KEY in .env."
-        )
 
     try:
         from google import genai
         from google.genai import types
 
-        key_path = None
-        if settings.GOOGLE_APPLICATION_CREDENTIALS and settings.GOOGLE_APPLICATION_CREDENTIALS.strip():
-            key_path = Path(settings.GOOGLE_APPLICATION_CREDENTIALS.strip())
-            if not key_path.is_absolute():
-                key_path = ROOT_DIR / key_path
-            if key_path.exists():
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(key_path)
-
-        if is_vertex:
-            if key_path and key_path.exists():
-                try:
-                    from google.oauth2 import service_account
-                    creds = service_account.Credentials.from_service_account_file(
-                        str(key_path), scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                    )
-                    client = genai.Client(vertexai=True, credentials=creds, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-                except Exception:
-                    client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-            else:
-                client = genai.Client(vertexai=True, project=settings.GCP_PROJECT_ID or None, location=settings.GCP_LOCATION or "global")
-        else:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = get_genai_client()
 
         # We construct JSON array output prompt
         prompt = f"{CLAIM_EXTRACTION_PROMPT}\n\nSCENE TEXT:\n<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>"
