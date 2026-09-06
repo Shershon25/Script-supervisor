@@ -310,12 +310,12 @@ export interface AnalyzeResponse {
 // --- Day 7 Unified Script Supervisor Interfaces ---
 
 export interface UnifiedAnalysisRunSummary {
-  entities_count: int;
-  facts_count: int;
-  events_count: int;
-  issues_count: int;
-  claims_count: int;
-  research_reused_count: int;
+  entities_count: number;
+  facts_count: number;
+  events_count: number;
+  issues_count: number;
+  claims_count: number;
+  research_reused_count: number;
 }
 
 export interface UnifiedAnalysisResponse {

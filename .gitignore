@@ -34,6 +34,7 @@ dist/
 .turbo/
 .npm/
 next-env.d.ts
+*.tsbuildinfo
 
 # Databases & Local Data
 cockroach-data/

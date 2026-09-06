@@ -1,3 +1,14 @@
+# Script Supervisor Backend - Google Cloud Build Pipeline
+#
+# GCP Cloud Build Trigger Configuration:
+# - Event: Push to branch (main)
+# - Build Configuration: Cloud Build configuration file (cloudbuild.yaml)
+# - Included files (glob):
+#     backend/**
+#     cloudbuild.yaml
+# - Ignored files (glob):
+#     frontend/**
+
 steps:
   # 1. Build the backend image
   - name: 'gcr.io/cloud-builders/docker'
