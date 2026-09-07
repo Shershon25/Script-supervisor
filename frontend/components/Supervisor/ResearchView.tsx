@@ -16,7 +16,12 @@ function cleanResearchText(text?: string): string {
     .trim();
 }
 
-export default function ResearchView({ projectId, onSelectSceneNumber }: Props) {
+interface ResearchViewProps {
+  projectId: string;
+  onSelectSceneNumber?: (sceneNum: number) => void;
+}
+
+export default function ResearchView({ projectId, onSelectSceneNumber }: ResearchViewProps) {
 
   const [claims, setClaims] = useState<ClaimResponse[]>([]);
   const [tasksMap, setTasksMap] = useState<Record<string, ResearchTaskResponse>>({});
