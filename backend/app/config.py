@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_CHEAP_PER_MIN: int = 120
     RATE_LIMIT_WRITE_PER_MIN: int = 30
     RATE_LIMIT_ANALYSIS_PER_MIN: int = 10
-    RATE_LIMIT_RESEARCH_PER_MIN: int = 5
-    RATE_LIMIT_IMPORT_PER_MIN: int = 3
+    RATE_LIMIT_RESEARCH_PER_MIN: int = 10
+    RATE_LIMIT_IMPORT_PER_MIN: int = 10
 
     # Daily IP Usage Protection Caps (Maximum executions per IP per 24 hours)
     MAX_ANALYSES_PER_IP_PER_DAY: int = 50

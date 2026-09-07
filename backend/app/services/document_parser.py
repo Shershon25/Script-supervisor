@@ -136,8 +136,8 @@ class DocxDocumentParser(DocumentParser):
         )
 
 
-class TxtDocumentParser(DocumentParser):
-    """Plain text parser preserving line breaks exactly."""
+class FountainDocumentParser(DocumentParser):
+    """Fountain screenplay document parser (.fountain) preserving line breaks and markdown format."""
 
     def parse(self, file_bytes: bytes, filename: str) -> ParsedDocument:
         try:
@@ -146,10 +146,10 @@ class TxtDocumentParser(DocumentParser):
             try:
                 text_str = file_bytes.decode("latin-1")
             except Exception as e:
-                raise ValueError("Could not decode text file. Ensure it is encoded in UTF-8 or ASCII.")
+                raise ValueError("Could not decode Fountain file. Ensure it is encoded in UTF-8 or ASCII.")
 
         if not text_str.strip():
-            raise ValueError("Uploaded text file is empty.")
+            raise ValueError("Uploaded Fountain screenplay file is empty.")
 
         lines = [line.rstrip() for line in text_str.splitlines()]
         raw_text = "\n".join(lines).strip()
@@ -159,9 +159,9 @@ class TxtDocumentParser(DocumentParser):
 
         return ParsedDocument(
             filename=filename,
-            file_type="txt",
+            file_type="fountain",
             file_size=len(file_bytes),
-            page_count=None,  # Null for TXT per requirements
+            page_count=None,
             character_count=total_chars,
             pages=pages,
             raw_text=raw_text,
@@ -201,7 +201,7 @@ class SceneBoundaryDetector:
     }
 
     COVER_PAGE_INDICATORS = re.compile(
-        r'\b(?:written\s+by|screenplay\s+by|story\s+by|created\s+by|teleplay\s+by|adapted\s+by|draft\s+date|copyright|all\s+rights\s+reserved|contact:|\bby\b)\b',
+        r'\b(?:title:|credit:|author:|authors:|source:|written\s+by|screenplay\s+by|story\s+by|created\s+by|teleplay\s+by|adapted\s+by|draft\s+date|copyright|all\s+rights\s+reserved|contact:)\b',
         re.IGNORECASE
     )
 
@@ -274,39 +274,46 @@ class SceneBoundaryDetector:
         if not lines_with_pages:
             return lines_with_pages
 
-        # Check first ~40 lines for title page metadata (e.g. Written by, Screenplay by)
-        first_chunk_lines = [l[0] for l in lines_with_pages[:40]]
-        cover_indicator_idx = -1
-
-        for i, line in enumerate(first_chunk_lines):
-            if self.COVER_PAGE_INDICATORS.search(line):
-                cover_indicator_idx = i
-
-        if cover_indicator_idx == -1:
-            return lines_with_pages
-
-        # Search for first scene heading AFTER the cover page metadata indicator line
-        first_scene_heading_idx = -1
-
-        for i in range(cover_indicator_idx + 1, len(lines_with_pages)):
-            clean_line = lines_with_pages[i][0].strip()
+        # Find the index of the VERY FIRST scene heading in the document
+        first_heading_idx = -1
+        for i, (line, _) in enumerate(lines_with_pages):
+            clean_line = line.strip()
             if not clean_line:
                 continue
-
             is_heading, _ = self.is_scene_heading(
                 clean_line,
-                is_first_non_empty=False,
+                is_first_non_empty=(i == 0),
                 preceded_by_blank=True,
                 allow_standalone_uppercase=True
             )
-
             if is_heading:
-                first_scene_heading_idx = i
+                first_heading_idx = i
                 break
 
-        if first_scene_heading_idx > 0:
-            logger.info(f"Cover page detected and stripped ({first_scene_heading_idx} lines omitted).")
-            return lines_with_pages[first_scene_heading_idx:]
+        if first_heading_idx <= 0:
+            # If no heading found or first line is already a heading, return intact
+            return lines_with_pages
+
+        # Preserve opening transition (e.g. FADE IN:) if directly preceding the first scene heading
+        start_idx = first_heading_idx
+        for check_idx in range(first_heading_idx - 1, -1, -1):
+            line_str = lines_with_pages[check_idx][0].strip().upper()
+            if not line_str:
+                continue
+            if line_str in ("FADE IN:", "FADE IN", "FADE IN.") or line_str.endswith("TO:"):
+                start_idx = check_idx
+                break
+            else:
+                break
+
+        # Check lines BEFORE start_idx for cover page indicators or metadata
+        preamble_lines = [l[0] for l in lines_with_pages[:start_idx]]
+        has_cover_indicator = any(self.COVER_PAGE_INDICATORS.search(l) for l in preamble_lines)
+
+        # Strip preamble lines if cover metadata is present or if preamble is short (title page metadata)
+        if has_cover_indicator or start_idx < 15:
+            logger.info(f"Cover page detected and stripped ({start_idx} preamble lines omitted before first scene heading).")
+            return lines_with_pages[start_idx:]
 
         return lines_with_pages
 
@@ -395,12 +402,15 @@ class SceneBoundaryDetector:
         scene_counter = 0
         is_first_non_empty = True
         preceded_by_blank = True
+        opening_preamble: List[str] = []
 
         for line, page_num in lines_with_pages:
             clean_line = line.strip()
             if not clean_line:
                 if current_lines:
                     current_lines.append("")
+                elif opening_preamble:
+                    opening_preamble.append("")
                 preceded_by_blank = True
                 continue
 
@@ -410,13 +420,9 @@ class SceneBoundaryDetector:
                 preceded_by_blank=preceded_by_blank
             )
 
-            # If document has unheaded content at start, fallback-initialize Scene 1 so no text is lost
-            if not is_heading and current_heading is None and is_first_non_empty:
-                current_heading = clean_line if len(clean_line) < 60 else "SCENE 1"
-                current_lines = [line]
-                current_page_start = page_num
-                current_page_end = page_num
-                current_confidence = 0.80
+            # If before the first scene heading, accumulate preamble text (e.g. FADE IN:)
+            if not is_heading and current_heading is None:
+                opening_preamble.append(line)
                 is_first_non_empty = False
                 preceded_by_blank = False
                 continue
@@ -429,8 +435,16 @@ class SceneBoundaryDetector:
                     finalize_scene(scene_counter)
 
                 current_heading = norm_heading
-                current_lines = [clean_line]
-                current_page_start = page_num
+                # Attach any opening preamble (e.g. FADE IN:) to the first scene
+                if opening_preamble:
+                    current_lines = [l for l in opening_preamble]
+                    current_lines.append("")
+                    current_lines.append(clean_line)
+                    opening_preamble = []
+                else:
+                    current_lines = [clean_line]
+
+                current_page_start = page_num if current_page_start is None else current_page_start
                 current_page_end = page_num
                 current_confidence = confidence
             else:
@@ -446,6 +460,12 @@ class SceneBoundaryDetector:
 
         if current_heading:
             scene_counter += 1
+            finalize_scene(scene_counter)
+        elif opening_preamble:
+            # Fallback if no scenes detected at all
+            scene_counter += 1
+            current_heading = "SCENE 1 (UNFORMATTED DOCUMENT)"
+            current_lines = opening_preamble
             finalize_scene(scene_counter)
 
         # Fallback if no scenes detected

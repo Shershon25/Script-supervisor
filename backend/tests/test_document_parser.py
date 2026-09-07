@@ -4,7 +4,7 @@ import docx
 from pypdf import PdfWriter
 
 from app.services.document_parser import (
-    TxtDocumentParser, DocxDocumentParser, PdfDocumentParser, SceneBoundaryDetector, ParsedDocument
+    FountainDocumentParser, DocxDocumentParser, PdfDocumentParser, SceneBoundaryDetector, ParsedDocument
 )
 
 SAMPLE_SCREENPLAY_TEXT = """INT. ARJUN'S APARTMENT - MORNING
@@ -55,13 +55,13 @@ def create_sample_pdf(text: str) -> bytes:
     return bio.getvalue()
 
 
-def test_txt_parser_preserves_line_order():
-    """Test 1 & 17: TXT parser preserves exact line order and page ranges are None."""
-    parser = TxtDocumentParser()
+def test_fountain_parser_preserves_line_order():
+    """Test 1 & 17: Fountain parser preserves exact line order and page ranges are None."""
+    parser = FountainDocumentParser()
     bytes_data = SAMPLE_SCREENPLAY_TEXT.encode("utf-8")
-    parsed_doc = parser.parse(bytes_data, "screenplay.txt")
+    parsed_doc = parser.parse(bytes_data, "screenplay.fountain")
 
-    assert parsed_doc.file_type == "txt"
+    assert parsed_doc.file_type == "fountain"
     assert parsed_doc.page_count is None
     assert "INT. ARJUN'S APARTMENT - MORNING" in parsed_doc.raw_text
     assert "INT. POLICE ARCHIVE - NIGHT" in parsed_doc.raw_text
@@ -81,9 +81,9 @@ def test_docx_parser_preserves_paragraph_order():
 
 def test_empty_files_rejected():
     """Test 5: Empty files raise ValueError."""
-    txt_parser = TxtDocumentParser()
+    fountain_parser = FountainDocumentParser()
     with pytest.raises(ValueError, match="empty"):
-        txt_parser.parse(b"", "empty.txt")
+        fountain_parser.parse(b"", "empty.fountain")
 
     docx_parser = DocxDocumentParser()
     with pytest.raises(ValueError):
@@ -141,8 +141,8 @@ Maya drives into the alley."""
 
 def test_sample_three_scene_fixture():
     """Test 32: Sample screenplay fixture produces exactly 3 scenes."""
-    parser = TxtDocumentParser()
-    parsed_doc = parser.parse(SAMPLE_SCREENPLAY_TEXT.encode("utf-8"), "sample.txt")
+    parser = FountainDocumentParser()
+    parsed_doc = parser.parse(SAMPLE_SCREENPLAY_TEXT.encode("utf-8"), "sample.fountain")
 
     detector = SceneBoundaryDetector()
     scenes = detector.detect_scenes(parsed_doc)

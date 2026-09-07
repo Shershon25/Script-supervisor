@@ -43,17 +43,17 @@ def setup_db():
 
 
 def test_document_import_preview_api():
-    """Test API: Upload TXT document for preview, check scene count and READY_FOR_REVIEW status."""
+    """Test API: Upload Fountain document for preview, check scene count and READY_FOR_REVIEW status."""
     p_res = client.post("/api/projects", json={"title": "Import API Test Project"}).json()
     proj_id = p_res["id"]
 
-    files = {"file": ("test_screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("test_screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     res = client.post(f"/api/projects/{proj_id}/documents/import", files=files)
 
     assert res.status_code == 200
     data = res.json()
-    assert data["filename"] == "test_screenplay.txt"
-    assert data["file_type"] == "txt"
+    assert data["filename"] == "test_screenplay.fountain"
+    assert data["file_type"] == "fountain"
     assert data["status"] == "READY_FOR_REVIEW"
     assert data["scene_count"] == 3
     assert len(data["scenes"]) == 3
@@ -65,7 +65,7 @@ def test_document_confirm_import_append():
     p_res = client.post("/api/projects", json={"title": "Confirm Import Project"}).json()
     proj_id = p_res["id"]
 
-    files = {"file": ("screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     preview_res = client.post(f"/api/projects/{proj_id}/documents/import", files=files).json()
     doc_id = preview_res["document_id"]
 
@@ -93,7 +93,7 @@ def test_document_confirm_import_replace():
     sc1 = client.post(f"/api/projects/{proj_id}/scenes", json={"scene_number": 1, "raw_text": "INT. OLD SCENE - DAY\nOld text."}).json()
 
     # Upload document
-    files = {"file": ("new_screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("new_screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     preview_res = client.post(f"/api/projects/{proj_id}/documents/import", files=files).json()
     doc_id = preview_res["document_id"]
 
@@ -111,7 +111,7 @@ def test_project_isolation_on_import():
     pA = client.post("/api/projects", json={"title": "Project Alpha"}).json()
     pB = client.post("/api/projects", json={"title": "Project Beta"}).json()
 
-    files = {"file": ("screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     preview_A = client.post(f"/api/projects/{pA['id']}/documents/import", files=files).json()
     doc_A_id = preview_A["document_id"]
 
@@ -123,7 +123,7 @@ def test_project_isolation_on_import():
 def test_duplicate_confirmation_idempotent():
     """Test 23: Duplicate confirmation calls return already imported message without duplicating scenes."""
     p = client.post("/api/projects", json={"title": "Idempotent Project"}).json()
-    files = {"file": ("screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     preview = client.post(f"/api/projects/{p['id']}/documents/import", files=files).json()
     doc_id = preview["document_id"]
 
@@ -141,7 +141,7 @@ def test_duplicate_confirmation_idempotent():
 def test_imported_scene_analyzed_by_existing_pipeline():
     """Test 24-29: Imported scene can be analyzed by existing unified scene analysis service."""
     p = client.post("/api/projects", json={"title": "Unified Analysis Integration Project"}).json()
-    files = {"file": ("screenplay.txt", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
+    files = {"file": ("screenplay.fountain", io.BytesIO(SAMPLE_TXT_CONTENT.encode("utf-8")), "text/plain")}
     preview = client.post(f"/api/projects/{p['id']}/documents/import", files=files).json()
     doc_id = preview["document_id"]
 

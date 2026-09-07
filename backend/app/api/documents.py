@@ -12,24 +12,24 @@ from app.schemas.document import (
     ImportPreviewResponse, ParsedSceneResponse, ConfirmImportRequest, ImportedDocumentResponse
 )
 from app.services.document_parser import (
-    PdfDocumentParser, DocxDocumentParser, TxtDocumentParser, SceneBoundaryDetector, ParsedDocument
+    PdfDocumentParser, DocxDocumentParser, FountainDocumentParser, SceneBoundaryDetector, ParsedDocument
 )
 
 logger = logging.getLogger("script_supervisor.api_documents")
 
 router = APIRouter(prefix="/api/projects/{project_id}/documents", tags=["Document Import"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".fountain"}
 
 import os
 
 def sanitize_filename(filename: str) -> str:
     """Strips path traversal indicators from uploaded filename."""
     if not filename:
-        return "screenplay.txt"
+        return "screenplay.fountain"
     # Take basename only
     base = os.path.basename(filename.replace("\\", "/")).strip()
-    return base or "screenplay.txt"
+    return base or "screenplay.fountain"
 
 def validate_file_metadata(filename: str, file_size: int):
     """Validates filename extension and size limits."""
@@ -38,14 +38,14 @@ def validate_file_metadata(filename: str, file_size: int):
     if dot_idx == -1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file has no extension. Supported formats are PDF (.pdf), DOCX (.docx), and Plain Text (.txt)."
+            detail="Uploaded file has no extension. Supported formats are PDF (.pdf), DOCX (.docx), and Fountain (.fountain)."
         )
 
     ext = clean_name[dot_idx:].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type '{ext}'. Supported formats are PDF (.pdf), DOCX (.docx), and Plain Text (.txt)."
+            detail=f"Unsupported file type '{ext}'. Supported formats are PDF (.pdf), DOCX (.docx), and Fountain (.fountain)."
         )
 
     max_bytes = settings.MAX_IMPORT_FILE_SIZE_MB * 1024 * 1024
@@ -65,7 +65,7 @@ async def import_document_preview(
     db: Session = Depends(get_db)
 ):
     """
-    Ingests a PDF, DOCX, or TXT screenplay document, extracts text deterministically,
+    Ingests a PDF, DOCX, or Fountain screenplay document, extracts text deterministically,
     detects scene boundaries, stores temporary preview state, and returns an import preview.
     """
     # 1. Validate project exists
@@ -73,7 +73,7 @@ async def import_document_preview(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
 
-    raw_filename = file.filename or "screenplay.txt"
+    raw_filename = file.filename or "screenplay.fountain"
     filename = sanitize_filename(raw_filename)
     file_bytes = await file.read()
     file_size = len(file_bytes)
@@ -89,7 +89,7 @@ async def import_document_preview(
         elif file_type == "docx":
             parser = DocxDocumentParser()
         else:
-            parser = TxtDocumentParser()
+            parser = FountainDocumentParser()
 
         parsed_doc: ParsedDocument = parser.parse(file_bytes, filename)
     except ValueError as ve:

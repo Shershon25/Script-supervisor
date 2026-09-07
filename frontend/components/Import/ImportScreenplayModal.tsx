@@ -73,8 +73,8 @@ export default function ImportScreenplayModal({
 
   const processSelectedFile = async (file: File) => {
     const filename = file.name.toLowerCase();
-    if (!filename.endsWith('.pdf') && !filename.endsWith('.docx') && !filename.endsWith('.txt')) {
-      setErrorMessage("Unsupported file format. Please select a .pdf, .docx, or .txt file.");
+    if (!filename.endsWith('.pdf') && !filename.endsWith('.docx') && !filename.endsWith('.fountain')) {
+      setErrorMessage("Unsupported file format. Please select a .pdf, .docx, or .fountain file.");
       setStage('ERROR');
       return;
     }
@@ -128,7 +128,7 @@ export default function ImportScreenplayModal({
             <div>
               <h3 className="font-bold text-base text-txtPrimary">Import Screenplay Document</h3>
               <p className="text-xs text-txtSecondary mt-0.5">
-                Ingest PDF, DOCX, or TXT screenplay files for deterministic scene detection.
+                Ingest PDF, DOCX, or Fountain screenplay files for deterministic scene detection.
               </p>
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function ImportScreenplayModal({
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept=".pdf,.docx,.txt"
+                  accept=".pdf,.docx,.fountain"
                   className="hidden"
                 />
                 <div className="p-3.5 bg-blue-500/10 rounded-2xl text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
@@ -167,7 +167,7 @@ export default function ImportScreenplayModal({
                     Click to upload or drag & drop screenplay document
                   </p>
                   <p className="text-[11px] text-txtSecondary mt-1">
-                    Supports <span className="font-semibold text-txtPrimary">.PDF</span>, <span className="font-semibold text-txtPrimary">.DOCX</span>, and <span className="font-semibold text-txtPrimary">.TXT</span> (up to 15MB)
+                    Supports <span className="font-semibold text-txtPrimary">.PDF</span>, <span className="font-semibold text-txtPrimary">.DOCX</span>, and <span className="font-semibold text-txtPrimary">.FOUNTAIN</span> (up to 15MB)
                   </p>
                 </div>
               </div>
