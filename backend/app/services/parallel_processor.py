@@ -19,8 +19,13 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
     3. Worker 3: Plot Timeline Extraction (extract_plot_timeline)
 
     Strictly limits parallel API calls to at most 3 concurrent calls.
+    Uses independent SessionLocal sessions and thread-safe primitive parameters per worker.
     """
-    logger.info(f"Running parallel downstream analysis for scene #{scene.scene_number} (max_workers=3)")
+    scene_id = scene.id
+    scene_number = scene.scene_number
+    scene_raw_text = scene.raw_text
+
+    logger.info(f"Running parallel downstream analysis for scene #{scene_number} (max_workers=3)")
 
     try:
         db.flush()
@@ -28,36 +33,33 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
     except Exception as e:
         logger.warning(f"Notice on pre-parallel flush/commit: {e}")
 
-    from sqlalchemy.orm import sessionmaker
-    WorkerSessionMaker = sessionmaker(bind=db.get_bind())
-
     def task_continuity() -> List[Any]:
-        with WorkerSessionMaker() as worker_db:
+        with SessionLocal() as worker_db:
             try:
-                return check_scene_continuity(worker_db, project_id, scene.id)
+                return check_scene_continuity(worker_db, project_id, scene_id)
             except Exception as e:
-                logger.error(f"Continuity check failed for scene #{scene.scene_number}: {e}", exc_info=True)
+                logger.error(f"Continuity check failed for scene #{scene_number}: {e}", exc_info=True)
                 return []
 
     def task_claims():
-        with WorkerSessionMaker() as worker_db:
+        with SessionLocal() as worker_db:
             try:
-                worker_scene = worker_db.query(Scene).filter(Scene.id == scene.id).first()
+                worker_scene = worker_db.query(Scene).filter(Scene.id == scene_id).first()
                 if worker_scene:
                     process_scene_claims(worker_db, project_id, worker_scene)
             except Exception as e:
-                logger.warning(f"Notice on claim processing for scene #{scene.scene_number}: {e}")
+                logger.warning(f"Notice on claim processing for scene #{scene_number}: {e}")
 
     def task_timeline():
-        with WorkerSessionMaker() as worker_db:
+        with SessionLocal() as worker_db:
             try:
                 prev_events = worker_db.query(PlotEvent).filter(
                     PlotEvent.project_id == project_id,
-                    PlotEvent.scene_number < scene.scene_number
+                    PlotEvent.scene_number < scene_number
                 ).order_by(PlotEvent.scene_number.asc()).all()
                 
                 prev_summary = "\n".join([f"Scene {pe.scene_number} ({pe.event_id}): {pe.title} - {pe.description}" for pe in prev_events])
-                res: PlotTimelineResponse = extract_plot_timeline(scene.scene_number, scene.raw_text, prev_summary)
+                res: PlotTimelineResponse = extract_plot_timeline(scene_number, scene_raw_text, prev_summary)
                 
                 for pe in res.plot_events:
                     existing_pe = worker_db.query(PlotEvent).filter(
@@ -67,7 +69,7 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
                     if not existing_pe:
                         pe_obj = PlotEvent(
                             project_id=project_id,
-                            scene_id=scene.id,
+                            scene_id=scene_id,
                             event_id=pe.event_id,
                             scene_number=pe.scene_number,
                             title=pe.title,
@@ -82,7 +84,7 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
                         worker_db.add(pe_obj)
                 worker_db.commit()
             except Exception as e:
-                logger.warning(f"Notice on plot timeline extraction for scene #{scene.scene_number}: {e}")
+                logger.warning(f"Notice on plot timeline extraction for scene #{scene_number}: {e}")
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         future_cont = executor.submit(task_continuity)
