@@ -248,7 +248,10 @@ def generate_candidates_for_scene(
     if curr_obj_entities:
         # Build current scene text blob for object reference confirmation
         curr_fact_blob_rows = db.execute(text("""
-            SELECT subject, predicate, value FROM facts WHERE scene_id = :sid
+            SELECT e.name as subject, f.predicate, f.value
+            FROM facts f
+            JOIN entities e ON f.subject_entity_id = e.id
+            WHERE f.scene_id = :sid
         """), {"sid": scene.id}).fetchall()
         curr_event_blob_rows = db.execute(text("""
             SELECT description FROM events WHERE scene_id = :sid
@@ -267,12 +270,13 @@ def generate_candidates_for_scene(
 
             # Query prior facts mentioning this object
             p_facts = db.execute(text("""
-                SELECT f.subject, f.predicate, f.value, s.scene_number, s.id as scene_id
+                SELECT e.name as subject, f.predicate, f.value, s.scene_number, s.id as scene_id
                 FROM facts f
+                JOIN entities e ON f.subject_entity_id = e.id
                 JOIN scenes s ON f.scene_id = s.id
                 WHERE s.project_id = :pid
                   AND s.scene_number < :csn
-                  AND (lower(f.subject) LIKE :pat OR lower(f.value) LIKE :pat OR lower(f.predicate) LIKE :pat)
+                  AND (lower(e.name) LIKE :pat OR lower(f.value) LIKE :pat OR lower(f.predicate) LIKE :pat)
                 ORDER BY s.scene_number ASC
             """), {"pid": project_id, "csn": scene.scene_number, "pat": f"%{obj_lower}%"}).fetchall()
 
