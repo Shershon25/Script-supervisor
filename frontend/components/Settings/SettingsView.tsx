@@ -24,6 +24,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
   // Draft states for explicit batch save
   const [draftRealityLevel, setDraftRealityLevel] = useState<number>(5);
   const [draftContinuityStrictness, setDraftContinuityStrictness] = useState<number>(5);
+  const [draftAutoBackgroundAnalysis, setDraftAutoBackgroundAnalysis] = useState<boolean>(true);
   const [draftWorldRules, setDraftWorldRules] = useState<StoryWorldRule[]>([]);
 
   // Confirmation Modal state
@@ -44,6 +45,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
       setSettings(res);
       setDraftRealityLevel(res.reality_level);
       setDraftContinuityStrictness(res.continuity_strictness);
+      setDraftAutoBackgroundAnalysis(res.auto_background_analysis_enabled !== false);
       setDraftWorldRules(res.world_rules || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load project settings.');
@@ -71,6 +73,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
     settings && (
       draftRealityLevel !== settings.reality_level || 
       draftContinuityStrictness !== settings.continuity_strictness ||
+      draftAutoBackgroundAnalysis !== (settings.auto_background_analysis_enabled !== false) ||
       isRulesDifferent
     )
   );
@@ -79,6 +82,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
     if (!settings) return;
     setDraftRealityLevel(settings.reality_level);
     setDraftContinuityStrictness(settings.continuity_strictness);
+    setDraftAutoBackgroundAnalysis(settings.auto_background_analysis_enabled !== false);
     setDraftWorldRules(settings.world_rules || []);
     setEditingRuleId(null);
     setEditRuleText('');
@@ -129,12 +133,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
       setSaving(true);
       setError(null);
 
-      // 1. Update sliders if changed
+      // 1. Update sliders/settings if changed
       if (
         draftRealityLevel !== settings.reality_level ||
-        draftContinuityStrictness !== settings.continuity_strictness
+        draftContinuityStrictness !== settings.continuity_strictness ||
+        draftAutoBackgroundAnalysis !== (settings.auto_background_analysis_enabled !== false)
       ) {
-        await updateProjectSettings(projectId, draftRealityLevel, draftContinuityStrictness);
+        await updateProjectSettings(projectId, draftRealityLevel, draftContinuityStrictness, draftAutoBackgroundAnalysis);
       }
 
       // 2. Reconcile World Rules
@@ -420,6 +425,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ projectId }) => {
           </div>
         </section>
       </div>
+
+      {/* MIDDLE ROW: Auto Background Analysis Setting */}
+      <section className={`bg-card border rounded-xl p-4 shadow-sm transition-colors ${draftAutoBackgroundAnalysis !== (settings.auto_background_analysis_enabled !== false) ? 'border-emerald-500/50' : 'border-border'}`}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0">
+              <RefreshCw className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-txtPrimary">Automatic Background Scene Analysis</h2>
+                {draftAutoBackgroundAnalysis !== (settings.auto_background_analysis_enabled !== false) && (
+                  <span className="text-[10px] text-tertiary font-semibold uppercase tracking-wider">Unsaved</span>
+                )}
+              </div>
+              <p className="text-xs text-txtSecondary mt-0.5">
+                Automatically evaluate the previous scene in the background when a new scene is added.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDraftAutoBackgroundAnalysis(!draftAutoBackgroundAnalysis)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-panel hover:bg-cardHover text-xs font-semibold transition shrink-0"
+          >
+            {draftAutoBackgroundAnalysis ? (
+              <>
+                <ToggleRight className="w-5 h-5 text-emerald-500" />
+                <span className="text-emerald-600 dark:text-emerald-400">Enabled</span>
+              </>
+            ) : (
+              <>
+                <ToggleLeft className="w-5 h-5 text-txtMuted" />
+                <span className="text-txtMuted">Disabled</span>
+              </>
+            )}
+          </button>
+        </div>
+      </section>
 
       {/* BOTTOM ROW: Story World Rules */}
       <section className={`bg-card border rounded-xl p-5 space-y-4 shadow-sm transition-colors ${isRulesDifferent ? 'border-indigo-500/50' : 'border-border'}`}>

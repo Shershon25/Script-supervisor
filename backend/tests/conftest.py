@@ -34,12 +34,29 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
+from app.services.rate_limiter import limiter
+
 @pytest.fixture(autouse=True, scope="session")
 def setup_db():
     """Ensure database tables are created once before test suite runs."""
     Base.metadata.create_all(bind=test_engine)
     yield
     Base.metadata.drop_all(bind=test_engine)
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Reset rate limiter counts between tests."""
+    limiter.reset_all()
+    yield
+    limiter.reset_all()
+
+@pytest.fixture
+def db_session():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @pytest.fixture
 def client():

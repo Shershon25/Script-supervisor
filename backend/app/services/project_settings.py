@@ -14,6 +14,7 @@ def get_or_create_project_settings(db: Session, project_id: str) -> ProjectSetti
             project_id=project_id,
             reality_level=5,
             continuity_strictness=5,
+            auto_background_analysis_enabled=True,
             settings_version=1
         )
         db.add(settings)

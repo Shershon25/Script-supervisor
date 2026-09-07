@@ -248,20 +248,10 @@ def process_scene(db: Session, project_id: str, scene_number: int, raw_text: str
         # 9. Build updated Story State
         updated_story_state = build_story_state(db, project_id)
 
-        # 10. Run Day 3 Continuity Detection Engine (Non-blocking)
-        detected_issues = []
-        try:
-            detected_issues = check_scene_continuity(db, project_id, scene.id)
-            logger.info(f"Continuity check completed. Found {len(detected_issues)} issues for scene #{scene_number}.")
-        except Exception as ce:
-            logger.error(f"Continuity check failed for scene #{scene_number}: {ce}", exc_info=True)
-
-        # 11. Day 5: Extract Claims & Trigger Gated External Research
-        from app.services.research_service import process_scene_claims
-        try:
-            process_scene_claims(db, project_id, scene)
-        except Exception as claim_err:
-            logger.warning(f"Notice on claim processing for scene #{scene_number}: {claim_err}")
+        # 10. Run downstream AI tasks in parallel (Continuity, Claims & Research, Plot Timeline) capped at max_workers=3
+        from app.services.parallel_processor import execute_scene_downstream_tasks_parallel
+        parallel_results = execute_scene_downstream_tasks_parallel(db, project_id, scene)
+        detected_issues = parallel_results.get("issues", [])
 
         logger.info(f"Scene #{scene_number} processed successfully.")
         scene.is_analyzed = True

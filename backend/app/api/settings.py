@@ -32,6 +32,7 @@ def get_project_settings_endpoint(project_id: str, db: Session = Depends(get_db)
         project_id=settings.project_id,
         reality_level=settings.reality_level,
         continuity_strictness=settings.continuity_strictness,
+        auto_background_analysis_enabled=settings.auto_background_analysis_enabled,
         settings_version=settings.settings_version,
         world_rules=[StoryWorldRuleResponse.model_validate(r) for r in rules],
         created_at=settings.created_at,
@@ -45,7 +46,7 @@ def update_project_settings_endpoint(
     payload: ProjectSettingsUpdate,
     db: Session = Depends(get_db)
 ):
-    """Updates reality level (0-10) and/or continuity strictness (0-10) for a project."""
+    """Updates reality level (0-10), continuity strictness (0-10), and auto_background_analysis_enabled for a project."""
     verify_project_exists(db, project_id)
     settings = get_or_create_project_settings(db, project_id)
 
@@ -62,6 +63,10 @@ def update_project_settings_endpoint(
         settings.continuity_strictness = payload.continuity_strictness
         updated = True
 
+    if payload.auto_background_analysis_enabled is not None:
+        settings.auto_background_analysis_enabled = payload.auto_background_analysis_enabled
+        updated = True
+
     if updated:
         settings.settings_version += 1
         db.commit()
@@ -73,6 +78,7 @@ def update_project_settings_endpoint(
         project_id=settings.project_id,
         reality_level=settings.reality_level,
         continuity_strictness=settings.continuity_strictness,
+        auto_background_analysis_enabled=settings.auto_background_analysis_enabled,
         settings_version=settings.settings_version,
         world_rules=[StoryWorldRuleResponse.model_validate(r) for r in rules],
         created_at=settings.created_at,

@@ -7,25 +7,77 @@ from app.db.models import Scene, Project
 from app.schemas.scene import SceneCreate, SceneUpdate, SceneResponse
 from app.services.scene_processor import process_scene
 
+from app.services.background_processor import run_previous_scene_analysis_background
+from fastapi import BackgroundTasks
+
 router = APIRouter(prefix="/api/projects/{project_id}/scenes", tags=["Scenes"])
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def analyze_and_create_scene(
+def create_and_save_scene(
     project_id: str,
     payload: SceneCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Submits a scene for AI analysis, validates structured output,
-    persists Entities, Facts, and Events into CockroachDB/PostgreSQL,
-    and returns the structured scene analysis result.
+    Creates/saves scene N quickly and triggers background AI evaluation for previous scene (N-1).
     """
-    return process_scene(
-        db=db,
-        project_id=project_id,
-        scene_number=payload.scene_number,
-        raw_text=payload.raw_text
-    )
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
+
+    existing_scene = db.query(Scene).filter(
+        Scene.project_id == project_id,
+        Scene.scene_number == payload.scene_number
+    ).first()
+
+    if existing_scene:
+        scene = existing_scene
+        scene.raw_text = payload.raw_text
+    else:
+        scene = Scene(
+            project_id=project_id,
+            scene_number=payload.scene_number,
+            raw_text=payload.raw_text
+        )
+        db.add(scene)
+    db.commit()
+    db.refresh(scene)
+
+    # Schedule background analysis for previous scene (N - 1)
+    if payload.scene_number > 1:
+        background_tasks.add_task(
+            run_previous_scene_analysis_background,
+            project_id=project_id,
+            previous_scene_number=payload.scene_number - 1
+        )
+
+    return {
+        "scene": {
+            "id": scene.id,
+            "project_id": scene.project_id,
+            "scene_number": scene.scene_number,
+            "raw_text": scene.raw_text,
+            "is_analyzed": scene.is_analyzed,
+            "created_at": scene.created_at.isoformat(),
+        }
+    }
+
+
+@router.post("/{scene_id}/analyze")
+def analyze_scene_manually(
+    project_id: str,
+    scene_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Manually triggers immediate scene analysis using the rate-limited parallel processor flow.
+    """
+    scene = db.query(Scene).filter(Scene.id == scene_id, Scene.project_id == project_id).first()
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found.")
+
+    return process_scene(db, project_id, scene.scene_number, scene.raw_text)
 
 
 @router.put("/{scene_id}", response_model=SceneResponse)

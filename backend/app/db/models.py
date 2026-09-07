@@ -388,6 +388,7 @@ class ProjectSettings(Base):
     project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
     reality_level = Column(Integer, default=5, nullable=False)
     continuity_strictness = Column(Integer, default=5, nullable=False)
+    auto_background_analysis_enabled = Column(Boolean, default=True, nullable=False)
     settings_version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
