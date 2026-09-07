@@ -1,4 +1,4 @@
-"""Day 4 Schema: Issue Reviews and Decision Fingerprints
+"""Issue Reviews and Decision Fingerprints Schema
 
 Revision ID: 004_day4_issue_reviews
 Revises: 003_day3_continuity_issues

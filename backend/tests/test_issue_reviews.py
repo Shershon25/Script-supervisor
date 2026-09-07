@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 def test_issue_review_lifecycle_and_history(client):
     # 1. Create project & conflicting scenes
-    proj_res = client.post("/api/projects", json={"title": "Day 4 Review Test"})
+    proj_res = client.post("/api/projects", json={"title": "Issue Review Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 

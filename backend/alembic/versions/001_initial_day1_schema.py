@@ -1,4 +1,4 @@
-"""Initial Day 1 Schema
+"""Initial Core Schema
 
 Revision ID: 001_initial_day1_schema
 Revises: 

@@ -1,4 +1,4 @@
-"""Day 5 Schema: External Claims, Research Tasks, Results & Evaluations
+"""External Claims, Research Tasks, Results & Evaluations Schema
 
 Revision ID: 005_day5_claims_and_research
 Revises: 004_day4_issue_reviews

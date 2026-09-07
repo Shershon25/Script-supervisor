@@ -169,7 +169,7 @@ def generate_candidates_for_scene(
 
 def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[IssueResponse]:
     """
-    Main Day 3 & Day 4 Service Function:
+    Main Continuity Service Function:
     Checks scene_id for continuity conflicts against prior Story State.
     Uses issue fingerprinting, active Story World Rules, Continuity Strictness, and writer decision suppression.
     """

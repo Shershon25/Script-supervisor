@@ -6,7 +6,7 @@ logger = logging.getLogger("script_supervisor.context_assembler")
 
 def assemble_reasoning_prompt_context(items: List[RetrievedItem], scene_text: str, scene_number: int) -> str:
     """
-    Day 6 Core Context Assembler:
+    Context Assembler:
     Formats hybrid retrieved evidence into a structured, token-efficient,
     provenance-tagged context string for Gemini AI reasoning prompts.
     """

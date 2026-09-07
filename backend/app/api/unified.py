@@ -14,7 +14,7 @@ def analyze_scene_unified_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Triggers end-to-end Day 7 Unified Script Supervisor Analysis for a scene.
+    Triggers end-to-end Unified Script Supervisor Analysis for a scene.
     Orchestrates parsing, historical boundary checking, hybrid retrieval, deterministic checks,
     AI story reasoning, gated external research, and issue deduplication.
     """

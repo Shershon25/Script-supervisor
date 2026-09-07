@@ -1,4 +1,4 @@
-"""Day 7 Scene Analysis Runs table
+"""Scene Analysis Runs Schema
 
 Revision ID: 007_day7_unified_runs
 Revises: 006_day6_retrieval_reasoning

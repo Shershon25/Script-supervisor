@@ -22,7 +22,7 @@ class IssueResponse(BaseModel):
     status: str
     evidence: List[IssueEvidence] = Field(default_factory=list)
     
-    # Day 4 Human Review Fields
+    # Human Review Fields
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
     resolution_type: Optional[str] = None

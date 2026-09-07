@@ -79,7 +79,7 @@ def resolve_or_create_entity(
 
 def process_scene(db: Session, project_id: str, scene_number: int, raw_text: str):
     """
-    Core Day 3 scene processing service:
+    Core scene processing service:
     1. Validates project
     2. Persists scene
     3. Analyzes screenplay with Gemini

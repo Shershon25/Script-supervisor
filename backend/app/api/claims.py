@@ -66,7 +66,7 @@ def trigger_claim_research(
     db: Session = Depends(get_db)
 ):
     """
-    Day 5 Core Endpoint:
+    Core Research Endpoint:
     Triggers or re-runs Parallel web research for a specific claim.
     """
     task, eval_obj = execute_research_for_claim(

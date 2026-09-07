@@ -94,8 +94,8 @@ def test_knowledge_transfer_no_conflict(client):
     assert len(knowledge_issues) == 0
 
 
-def test_day3_10_scene_acceptance_scenario(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 3 10-Scene Acceptance Test"})
+def test_multi_scene_acceptance_scenario(client):
+    proj_res = client.post("/api/projects", json={"title": "Multi-Scene Acceptance Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 

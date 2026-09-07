@@ -384,7 +384,7 @@ def extract_claims_from_scene(scene_text: str) -> List[ClaimExtraction]:
 
 def execute_research_for_claim(db: Session, project_id: str, claim_id: str, force_refresh: bool = False) -> Tuple[ResearchTask, ResearchEvaluation]:
     """
-    Day 5 Core Service Function:
+    Core Research Service Function:
     Executes gated, deduplicated Parallel web research for a screenplay claim,
     persists retrieved sources, and invokes Gemini for structured evidence evaluation.
     """

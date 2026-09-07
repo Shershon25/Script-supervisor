@@ -29,7 +29,7 @@ def is_valid_character_name(name: str) -> bool:
 
 def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional[int] = None) -> StoryStateResponse:
     """
-    Core Day 2 & Day 3 Service:
+    Core Story State Service:
     Derives current fictional world state from historical records.
     Supports historical snapshotting via up_to_scene_number parameter so continuity checking
     can compare Scene N against the exact Story State prior to Scene N.

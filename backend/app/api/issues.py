@@ -82,7 +82,7 @@ def review_issue_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Day 4 Core Endpoint:
+    Core Issue Review Endpoint:
     Submits a writer review action (ACCEPT | IGNORE | RESOLVE | REOPEN) with resolution note.
     Atomically updates issue status and records audit history.
     """

@@ -54,6 +54,9 @@ def reset_rate_limits():
     yield
     limiter.reset_all()
 
+from app.db.models import User
+from app.core.security import hash_password, create_access_token
+
 @pytest.fixture
 def db_session():
     db = TestingSessionLocal()
@@ -63,6 +66,21 @@ def db_session():
         db.close()
 
 @pytest.fixture
-def client():
-    with TestClient(app) as c:
+def test_user(db_session):
+    u = db_session.query(User).filter(User.username == "testuser").first()
+    if not u:
+        u = User(username="testuser", hashed_password=hash_password("testpass123"))
+        db_session.add(u)
+        db_session.commit()
+        db_session.refresh(u)
+    return u
+
+@pytest.fixture
+def auth_headers(test_user):
+    token = create_access_token({"sub": test_user.id, "username": test_user.username})
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.fixture
+def client(auth_headers):
+    with TestClient(app, headers=auth_headers) as c:
         yield c

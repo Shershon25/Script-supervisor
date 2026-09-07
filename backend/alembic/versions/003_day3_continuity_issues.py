@@ -1,4 +1,4 @@
-"""Day 3 Schema: Continuity Issues Table
+"""Continuity Issues Table Schema
 
 Revision ID: 003_day3_continuity_issues
 Revises: 002_day2_story_state

@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 def test_hybrid_retrieval_and_provenance(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 6 Retrieval Test"})
+    proj_res = client.post("/api/projects", json={"title": "Hybrid Retrieval Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
@@ -41,7 +41,7 @@ def test_hybrid_retrieval_and_provenance(client):
 
 
 def test_targeted_reasoning_endpoint(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 6 Reasoning Test"})
+    proj_res = client.post("/api/projects", json={"title": "Targeted Reasoning Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 

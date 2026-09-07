@@ -222,7 +222,7 @@ def hybrid_retrieve_context(
     entity_names: Optional[List[str]] = None
 ) -> List[RetrievedItem]:
     """
-    Day 6 Core Retrieval Service Function:
+    Core Retrieval Service Function:
     Executes hybrid retrieval (Structured SQL + Writer Decisions + External Research + Semantic Paraphrase),
     deduplicates items, ranks by relevance, and applies strict context token limits.
     """

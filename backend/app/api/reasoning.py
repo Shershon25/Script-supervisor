@@ -14,7 +14,7 @@ def execute_reasoning_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Day 6 Reasoning Endpoint:
+    Core Reasoning Endpoint:
     Executes hybrid retrieval, assembles task-specific context with provenance tags,
     and returns targeted Gemini story reasoning.
     """

@@ -24,7 +24,7 @@ def compute_issue_fingerprint(project_id: str, issue_type: str, entity_name: str
 
 def review_issue(db: Session, project_id: str, issue_id: str, review_in: IssueReviewCreate) -> Tuple[Issue, IssueReview]:
     """
-    Core Day 4 Service:
+    Core Issue Review Service:
     Atomically updates issue status, resolution metadata, and records audit history.
     Validates state transitions (OPEN -> ACCEPTED/IGNORED/RESOLVED, REOPEN -> OPEN).
     """

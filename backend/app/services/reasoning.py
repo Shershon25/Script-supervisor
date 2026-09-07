@@ -158,7 +158,7 @@ def execute_targeted_reasoning(
     question: Optional[str] = None
 ) -> ReasoningResult:
     """
-    Day 6 Core Service Function:
+    Core Story Reasoning Service Function:
     Executes hybrid retrieval, assembles task-specific context with provenance tags,
     and invokes Gemini AI for contextual story reasoning.
     """

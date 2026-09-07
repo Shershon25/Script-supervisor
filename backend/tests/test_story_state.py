@@ -18,9 +18,9 @@ def test_empty_story_state(client):
     assert data["relationships"] == []
     assert data["knowledge_states"] == []
 
-def test_day2_5_scene_acceptance_scenario(client):
+def test_story_state_acceptance_scenario(client):
     # 1. Create project
-    proj_res = client.post("/api/projects", json={"title": "Day 2 5-Scene Acceptance Test"})
+    proj_res = client.post("/api/projects", json={"title": "Story State Acceptance Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 

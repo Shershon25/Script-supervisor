@@ -16,7 +16,7 @@ def retrieve_context_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Day 6 Debug & Inspection Endpoint:
+    Context Retrieval Endpoint:
     Returns ranked hybrid retrieved evidence items (SQL facts, events, writer decisions, research evidence) for a scene.
     """
     scene = db.query(Scene).filter(Scene.id == body.scene_id, Scene.project_id == project_id).first()

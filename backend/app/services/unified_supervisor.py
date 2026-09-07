@@ -15,7 +15,7 @@ logger = logging.getLogger("script_supervisor.unified_supervisor")
 
 def process_scene_unified(db: Session, project_id: str, scene_id: str) -> UnifiedAnalysisResponse:
     """
-    Day 7 Application Service: Unified Script Supervisor Scene Ingestion & Analysis Pipeline.
+    Application Service: Unified Script Supervisor Scene Ingestion & Analysis Pipeline.
     Orchestrates parsing, historical state boundary checking, hybrid retrieval, deterministic checks,
     AI story reasoning, gated external research, and issue deduplication.
     """

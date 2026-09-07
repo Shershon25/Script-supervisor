@@ -1,4 +1,4 @@
-"""Day 2 Schema: Relationships and Knowledge States
+"""Story State Schema: Relationships and Knowledge States
 
 Revision ID: 002_day2_story_state
 Revises: 001_initial_day1_schema

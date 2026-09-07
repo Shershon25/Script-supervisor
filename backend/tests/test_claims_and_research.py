@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 def test_claim_classification_types(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 5 Claim Test"})
+    proj_res = client.post("/api/projects", json={"title": "Claim Classification Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 

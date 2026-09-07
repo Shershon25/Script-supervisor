@@ -1,4 +1,4 @@
-"""Day 9 Imported Documents and Scene provenance fields
+"""Imported Documents and Scene Provenance Schema
 
 Revision ID: 009_imported_documents
 Revises: 008_project_settings

@@ -1,4 +1,4 @@
-"""Day 8 Project Settings and Story World Rules tables
+"""Project Settings and Story World Rules Schema
 
 Revision ID: 008_project_settings
 Revises: 007_day7_unified_runs

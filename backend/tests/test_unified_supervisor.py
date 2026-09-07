@@ -1,7 +1,7 @@
 import pytest
 
 def test_unified_scene_analysis_pipeline(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 7 Unified Test"})
+    proj_res = client.post("/api/projects", json={"title": "Unified Supervisor Test"})
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
@@ -26,7 +26,7 @@ def test_unified_scene_analysis_pipeline(client):
 
 
 def test_unified_analysis_idempotency(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 7 Idempotency Test"})
+    proj_res = client.post("/api/projects", json={"title": "Unified Analysis Idempotency Test"})
     project_id = proj_res.json()["id"]
 
     sc1_res = client.post(f"/api/projects/{project_id}/scenes", json={
@@ -45,7 +45,7 @@ def test_unified_analysis_idempotency(client):
 
 
 def test_historical_boundary_preservation(client):
-    proj_res = client.post("/api/projects", json={"title": "Day 7 Boundary Test"})
+    proj_res = client.post("/api/projects", json={"title": "Historical Boundary Test"})
     project_id = proj_res.json()["id"]
 
     # Scene 1: John in Chennai
