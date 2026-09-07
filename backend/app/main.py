@@ -100,11 +100,19 @@ def root_health_check():
 
 @app.on_event("startup")
 def startup_event():
-    logger.info("Initializing database tables & schema migrations...")
+    logger.info("Verifying database connection & initializing schema...")
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_target = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else settings.DATABASE_URL
+        logger.info(f"Database connection health check successful (Connected to {db_target}).")
+    except Exception as e:
+        logger.error(f"Database connection startup health check failed: {e}")
+
     try:
         Base.metadata.create_all(bind=engine)
 
-        # Ensure Day 4 & Day 5 columns exist on SQLite tables
+        # Ensure Day 4 & Day 5 columns exist on database tables
         inspector = inspect(engine)
         if "issues" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("issues")]
