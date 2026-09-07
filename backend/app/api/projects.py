@@ -3,17 +3,24 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import Project, Scene
+from app.db.models import Project, Scene, User
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.api.deps import get_current_user
+from app.services.project_settings import get_or_create_project_settings
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 
-from app.services.project_settings import get_or_create_project_settings
-
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-def create_new_project(project_in: ProjectCreate, db: Session = Depends(get_db)):
-    """Creates a new screenplay project."""
-    project = Project(title=project_in.title.strip())
+def create_new_project(
+    project_in: ProjectCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Creates a new screenplay project belonging to the authenticated user."""
+    project = Project(
+        user_id=current_user.id,
+        title=project_in.title.strip()
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -21,14 +28,21 @@ def create_new_project(project_in: ProjectCreate, db: Session = Depends(get_db))
     return project
 
 @router.get("", response_model=List[ProjectResponse])
-def get_all_projects(db: Session = Depends(get_db)):
-    """Lists all active screenplay projects."""
-    return db.query(Project).order_by(Project.created_at.desc()).all()
+def get_all_projects(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Lists all active screenplay projects belonging to the authenticated user."""
+    return db.query(Project).filter(Project.user_id == current_user.id).order_by(Project.created_at.desc()).all()
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-def get_project_by_id(project_id: str, db: Session = Depends(get_db)):
-    """Gets details for a single project by ID."""
-    project = db.query(Project).filter(Project.id == project_id).first()
+def get_project_by_id(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Gets details for a single project by ID (scoped to authenticated user)."""
+    project = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -40,10 +54,11 @@ def get_project_by_id(project_id: str, db: Session = Depends(get_db)):
 def rename_project(
     project_id: str,
     project_in: ProjectUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Renames an existing screenplay project."""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    """Renames an existing screenplay project belonging to the authenticated user."""
+    project = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -64,9 +79,13 @@ def rename_project(
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_200_OK)
-def delete_project_by_id(project_id: str, db: Session = Depends(get_db)):
+def delete_project_by_id(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Deletes a project and all associated screenplay data."""
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

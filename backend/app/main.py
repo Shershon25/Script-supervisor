@@ -6,7 +6,7 @@ from sqlalchemy import inspect, text
 
 from app.config import settings
 from app.db.database import engine, Base
-from app.api import health, projects, scenes, story_state, issues, claims, research, retrieval, reasoning, unified, timeline, settings as settings_api, documents, export_api
+from app.api import health, projects, scenes, story_state, issues, claims, research, retrieval, reasoning, unified, timeline, settings as settings_api, documents, export_api, auth
 
 # Configure logging
 logging.basicConfig(
@@ -17,8 +17,8 @@ logger = logging.getLogger("script_supervisor.main")
 
 app = FastAPI(
     title="Script Supervisor API",
-    description="Backend API for AI-powered Screenplay Story World Engine (Day 6 Hybrid Retrieval & Reasoning Refinement System)",
-    version="6.0.0"
+    description="Backend API for AI-powered Screenplay Story World Engine (Hybrid Retrieval & Reasoning System)",
+    version="1.0.0"
 )
 
 # CORS setup
@@ -41,8 +41,8 @@ async def security_and_rate_limit_middleware(request: Request, call_next):
     path = request.url.path
     method = request.method.upper()
 
-    # Skip health check from rate limiting
-    if path in ("/api/health", "/health"):
+    # Skip health check & auth endpoints from rate limiting
+    if path in ("/api/health", "/health") or path.startswith("/api/auth"):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -77,6 +77,7 @@ async def security_and_rate_limit_middleware(request: Request, call_next):
     return response
 
 # Include Routers
+app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(projects.router)
 app.include_router(scenes.router)
@@ -113,8 +114,14 @@ def startup_event():
     try:
         Base.metadata.create_all(bind=engine)
 
-        # Ensure Day 4 & Day 5 columns exist on database tables
         inspector = inspect(engine)
+
+        if "projects" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("projects")]
+            with engine.begin() as conn:
+                if "user_id" not in columns:
+                    conn.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(36)"))
+
         if "issues" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("issues")]
             with engine.begin() as conn:
@@ -151,7 +158,7 @@ def startup_event():
     except Exception as e:
         logger.warning(f"Notice on database schema initialization: {e}")
 
-    logger.info("Script Supervisor Backend started (Day 6 Hybrid Retrieval & Reasoning Refinement System active).")
+    logger.info("Script Supervisor Backend started (Hybrid Retrieval & Reasoning System active).")
     logger.info(f"Target FRONTEND_URL: {settings.FRONTEND_URL}")
 
 @app.exception_handler(Exception)

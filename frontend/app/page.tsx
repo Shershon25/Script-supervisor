@@ -16,10 +16,14 @@ import CharactersView from '@/components/Characters/CharactersView';
 import { TimelineView } from '@/components/Timeline/TimelineView';
 import { SettingsView } from '@/components/Settings/SettingsView';
 import { ToastProvider, useToast } from '@/components/UI/Toast';
-import { Film, FolderPlus } from 'lucide-react';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import AuthModal from '@/components/Auth/AuthModal';
+import { Film, FolderPlus, LogIn, FileText, Plus } from 'lucide-react';
 
 function HomeContent() {
   const toast = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -47,8 +51,16 @@ function HomeContent() {
   const [creatingProject, setCreatingProject] = useState(false);
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) {
+      fetchProjects();
+    } else {
+      setProjects([]);
+      setActiveProject(null);
+      setScenes([]);
+      setStoryState(null);
+      setIssues([]);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -428,7 +440,37 @@ function HomeContent() {
       />
 
       {/* Main Content Workspace */}
-      {!activeProject ? (
+      {!user ? (
+        <div className="flex-1 flex items-center justify-center p-6 min-h-0">
+          <div className="p-8 rounded-3xl bg-card border border-border max-w-md w-full text-center space-y-6 shadow-2xl">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <Film className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-txtPrimary">Script Supervisor Suite</h2>
+              <p className="text-xs text-txtSecondary mt-1">
+                Sign in or create an account to start writing screenplays, tracking continuity, and running AI analysis.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Log In / Sign Up</span>
+              </button>
+            </div>
+          </div>
+
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            theme={theme}
+          />
+        </div>
+      ) : !activeProject ? (
         <div className="flex-1 flex items-center justify-center p-6 min-h-0">
           <div className="p-8 rounded-3xl bg-card border border-border max-w-md w-full text-center space-y-6 shadow-2xl">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
@@ -474,14 +516,40 @@ function HomeContent() {
           />
 
           {/* Center Column: Screenplay Reader / Outline / Characters / Timeline */}
-          {activeTab === 'editor' && currentScene ? (
-            <ScreenplayPage
-              sceneNumber={currentScene.scene_number}
-              totalScenesCount={scenes.length}
-              rawText={currentScene.raw_text}
-              onChangeText={handleSceneTextChange}
-              onBlurSave={handleBlurSave}
-            />
+          {activeTab === 'editor' ? (
+            currentScene ? (
+              <ScreenplayPage
+                sceneNumber={currentScene.scene_number}
+                totalScenesCount={scenes.length}
+                rawText={currentScene.raw_text}
+                onChangeText={handleSceneTextChange}
+                onBlurSave={handleBlurSave}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-8 text-center bg-app">
+                <div className="max-w-md p-8 rounded-3xl bg-card border border-border space-y-5 shadow-xl">
+                  <div className="mx-auto w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <FileText className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-txtPrimary">No Scenes in Project</h3>
+                    <p className="text-xs text-txtSecondary mt-1">
+                      This screenplay project has no scenes yet. Add your first scene to start writing and tracking continuity.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2">
+                    <button
+                      onClick={handleAddScene}
+                      disabled={analyzing}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add First Scene</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           ) : activeTab === 'outline' ? (
             <OutlineView
               scenes={scenes}
@@ -539,9 +607,9 @@ function HomeContent() {
       {/* Bottom Status Bar with Dynamic Word and Line Metrics */}
       <footer className="h-7 border-t border bg-panel px-4 flex items-center justify-between text-[10px] font-mono text-txtSecondary select-none transition-colors">
         <div className="flex items-center space-x-3">
-          <span>Scene {activeSceneNumber} of {scenes.length || 1}</span>
+          <span>{scenes.length > 0 ? `Scene ${activeSceneNumber} of ${scenes.length}` : '0 Scenes'}</span>
           <span>•</span>
-          <span>Page {activeSceneNumber}</span>
+          <span>{scenes.length > 0 ? `Page ${activeSceneNumber}` : 'Page 0'}</span>
           <span>•</span>
           <span>{activeSceneWords.toLocaleString()} words ({totalProjectWords.toLocaleString()} total)</span>
           <span>•</span>
@@ -563,8 +631,10 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <ToastProvider>
-      <HomeContent />
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <HomeContent />
+      </ToastProvider>
+    </AuthProvider>
   );
 }

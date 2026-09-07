@@ -4,10 +4,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project } from '@/lib/api';
 
-import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Download, Trash2, Square, Pencil, HelpCircle } from 'lucide-react';
+import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Download, Trash2, Square, Pencil, HelpCircle, LogIn, LogOut, User as UserIcon, Film } from 'lucide-react';
 import ImportScreenplayModal from '@/components/Import/ImportScreenplayModal';
 import ExportScreenplayModal from '@/components/Export/ExportScreenplayModal';
 import { AboutModal } from '@/components/About/AboutModal';
+import { useAuth } from '@/context/AuthContext';
+import AuthModal from '@/components/Auth/AuthModal';
 
 interface Props {
   projects: Project[];
@@ -56,6 +58,8 @@ export default function HeaderNav({
   theme,
   onToggleTheme
 }: Props) {
+  const { user, logout } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -126,289 +130,306 @@ export default function HeaderNav({
       <header className="h-14 border-b border bg-panel backdrop-blur-md px-4 flex items-center justify-between sticky top-0 z-50 text-xs select-none transition-colors">
       {/* Left: Project Selector & Draft info */}
       <div className="flex items-center space-x-3">
-        {/* Searchable Project Selector Dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center space-x-1.5 font-bold text-txtPrimary hover:text-secondary focus:outline-none py-1 px-2 rounded-lg hover:bg-cardHover transition-colors text-xs"
-          >
-            <Folder className="w-3.5 h-3.5 text-secondary shrink-0" />
-            <span className="truncate max-w-[160px] sm:max-w-[220px]">
-              Projects / {activeProject?.title || 'Select Project'}
-            </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-txtSecondary transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
+        {!user ? (
+          <div className="flex items-center space-x-2 font-bold text-txtPrimary px-2 text-sm">
+            <Film className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>Script Supervisor</span>
+          </div>
+        ) : (
+          <>
+            {/* Searchable Project Selector Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center space-x-1.5 font-bold text-txtPrimary hover:text-secondary focus:outline-none py-1 px-2 rounded-lg hover:bg-cardHover transition-colors text-xs"
+              >
+                <Folder className="w-3.5 h-3.5 text-secondary shrink-0" />
+                <span className="truncate max-w-[160px] sm:max-w-[220px]">
+                  Projects / {activeProject?.title || 'Select Project'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-txtSecondary transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-          {dropdownOpen && (
-            <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-panel border border-border shadow-xl z-50 overflow-hidden flex flex-col p-2 text-xs">
-              {/* Search Bar */}
-              <div className="relative mb-2">
-                <Search className="w-3.5 h-3.5 text-txtSecondary absolute left-2.5 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
-                  className="w-full pl-8 pr-7 py-1.5 bg-cardHover border border-border rounded-lg text-txtPrimary placeholder-txtMuted text-xs focus:outline-none focus:border-secondary"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-2 text-txtSecondary hover:text-txtPrimary"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Project Options List */}
-              <div className="max-h-48 overflow-y-auto space-y-1">
-                {filteredProjects.length === 0 ? (
-                  <div className="p-3 text-center text-txtSecondary text-[11px]">
-                    No projects found
-                  </div>
-                ) : (
-                  filteredProjects.map((p) => {
-                    const isSelected = p.id === activeProject?.id;
-                    return (
-                      <div
-                        key={p.id}
-                        className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors group ${
-                          isSelected
-                            ? 'bg-accent/20 text-txtPrimary font-bold'
-                            : 'hover:bg-cardHover text-txtSecondary hover:text-txtPrimary'
-                        }`}
+              {dropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-panel border border-border shadow-xl z-50 overflow-hidden flex flex-col p-2 text-xs">
+                  {/* Search Bar */}
+                  <div className="relative mb-2">
+                    <Search className="w-3.5 h-3.5 text-txtSecondary absolute left-2.5 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1.5 bg-cardHover border border-border rounded-lg text-txtPrimary placeholder-txtMuted text-xs focus:outline-none focus:border-secondary"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-2 text-txtSecondary hover:text-txtPrimary"
                       >
-                        <button
-                          onClick={() => {
-                            onSelectProject(p);
-                            setDropdownOpen(false);
-                            setSearchQuery('');
-                          }}
-                          className="flex-1 text-left truncate flex items-center justify-between pr-1"
-                        >
-                          <span className="truncate">{p.title}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-secondary shrink-0 ml-1.5" />}
-                        </button>
-                        <div className="flex items-center space-x-0.5 shrink-0 opacity-60 group-hover:opacity-100">
-                          {onRenameProject && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProjectToRename(p);
-                                setRenameTitle(p.title);
-                                setDropdownOpen(false);
-                              }}
-                              className="p-1 rounded text-txtMuted hover:text-secondary hover:bg-secondary/10 transition-colors"
-                              title={`Rename project "${p.title}"`}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {onDeleteProject && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProjectToDelete(p);
-                                setDropdownOpen(false);
-                              }}
-                              className="p-1 rounded text-txtMuted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                              title={`Delete project "${p.title}"`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Project Options List */}
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {filteredProjects.length === 0 ? (
+                      <div className="p-3 text-center text-txtSecondary text-[11px]">
+                        No projects found
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                    ) : (
+                      filteredProjects.map((p) => {
+                        const isSelected = p.id === activeProject?.id;
+                        return (
+                          <div
+                            key={p.id}
+                            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors group ${
+                              isSelected
+                                ? 'bg-accent/20 text-txtPrimary font-bold'
+                                : 'hover:bg-cardHover text-txtSecondary hover:text-txtPrimary'
+                            }`}
+                          >
+                            <button
+                              onClick={() => {
+                                onSelectProject(p);
+                                setDropdownOpen(false);
+                                setSearchQuery('');
+                              }}
+                              className="flex-1 text-left truncate flex items-center justify-between pr-1"
+                            >
+                              <span className="truncate">{p.title}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-secondary shrink-0 ml-1.5" />}
+                            </button>
+                            <div className="flex items-center space-x-0.5 shrink-0 opacity-60 group-hover:opacity-100">
+                              {onRenameProject && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setProjectToRename(p);
+                                    setRenameTitle(p.title);
+                                    setDropdownOpen(false);
+                                  }}
+                                  className="p-1 rounded text-txtMuted hover:text-secondary hover:bg-secondary/10 transition-colors"
+                                  title={`Rename project "${p.title}"`}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {onDeleteProject && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setProjectToDelete(p);
+                                    setDropdownOpen(false);
+                                  }}
+                                  className="p-1 rounded text-txtMuted hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                  title={`Delete project "${p.title}"`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
 
-              {/* Divider & Action Buttons */}
-              <div className="pt-2 mt-1 border-t border-border space-y-1">
-                <button
-                  onClick={() => {
-                    setShowCreateModal(true);
-                    setDropdownOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-cardHover font-bold transition-colors text-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>New Project...</span>
-                </button>
+                  {/* Divider & Action Buttons */}
+                  <div className="pt-2 mt-1 border-t border-border space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowCreateModal(true);
+                        setDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-cardHover font-bold transition-colors text-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Project...</span>
+                    </button>
 
-                {activeProject && onRenameProject && (
-                  <button
-                    onClick={() => {
-                      setProjectToRename(activeProject);
-                      setRenameTitle(activeProject.title);
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-secondary" />
-                    <span>Rename Project...</span>
-                  </button>
-                )}
+                    {activeProject && onRenameProject && (
+                      <button
+                        onClick={() => {
+                          setProjectToRename(activeProject);
+                          setRenameTitle(activeProject.title);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-secondary" />
+                        <span>Rename Project...</span>
+                      </button>
+                    )}
 
-                {activeProject && (
-                  <button
-                    onClick={() => {
-                      setShowImportModal(true);
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-secondary" />
-                    <span>Import Screenplay...</span>
-                  </button>
-                )}
+                    {activeProject && (
+                      <button
+                        onClick={() => {
+                          setShowImportModal(true);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-secondary" />
+                        <span>Import Screenplay...</span>
+                      </button>
+                    )}
 
-                {activeProject && (
-                  <button
-                    onClick={() => {
-                      setShowExportModal(true);
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
-                  >
-                    <Download className="w-3.5 h-3.5 text-secondary" />
-                    <span>Export Screenplay...</span>
-                  </button>
-                )}
+                    {activeProject && (
+                      <button
+                        onClick={() => {
+                          setShowExportModal(true);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
+                      >
+                        <Download className="w-3.5 h-3.5 text-secondary" />
+                        <span>Export Screenplay...</span>
+                      </button>
+                    )}
 
-                {activeProject && onDeleteProject && (
-                  <button
-                    onClick={() => {
-                      setProjectToDelete(activeProject);
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 font-bold transition-colors text-xs"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Current Project...</span>
-                  </button>
-                )}
-              </div>
+                    {activeProject && onDeleteProject && (
+                      <button
+                        onClick={() => {
+                          setProjectToDelete(activeProject);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 font-bold transition-colors text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Current Project...</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="h-4 w-px bg-border hidden sm:block" />
+            {activeProject && (
+              <>
+                <div className="h-4 w-px bg-border hidden sm:block" />
 
-
-        {/* Workspace Mode Tabs */}
-        <div className="hidden sm:flex items-center space-x-1 font-semibold text-txtSecondary">
-          <button
-            onClick={() => onSelectTab('editor')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'editor' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Editor
-          </button>
-          <button
-            onClick={() => onSelectTab('outline')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'outline' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Outline
-          </button>
-          <button
-            onClick={() => onSelectTab('characters')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'characters' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Characters
-          </button>
-          <button
-            onClick={() => onSelectTab('reasoning')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'reasoning' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Reasoning
-          </button>
-          <button
-            onClick={() => onSelectTab('timeline')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'timeline' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Timeline
-          </button>
-          <button
-            onClick={() => onSelectTab('settings')}
-            className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'settings' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
-          >
-            Settings
-          </button>
-        </div>
+                {/* Workspace Mode Tabs */}
+                <div className="hidden sm:flex items-center space-x-1 font-semibold text-txtSecondary">
+                  <button
+                    onClick={() => onSelectTab('editor')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'editor' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Editor
+                  </button>
+                  <button
+                    onClick={() => onSelectTab('outline')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'outline' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Outline
+                  </button>
+                  <button
+                    onClick={() => onSelectTab('characters')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'characters' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Characters
+                  </button>
+                  <button
+                    onClick={() => onSelectTab('reasoning')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'reasoning' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Reasoning
+                  </button>
+                  <button
+                    onClick={() => onSelectTab('timeline')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'timeline' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Timeline
+                  </button>
+                  <button
+                    onClick={() => onSelectTab('settings')}
+                    className={`px-3 py-1 rounded-md transition-colors ${activeTab === 'settings' ? 'bg-accent/20 text-txtPrimary font-bold' : 'hover:text-txtPrimary'}`}
+                  >
+                    Settings
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
-
 
       {/* Center: Current Scene Badge */}
-      <div className="hidden md:flex items-center space-x-2 text-txtSecondary font-mono text-[11px]">
-        <span className="w-2 h-2 rounded-full bg-secondary animate-pulse flex-shrink-0" />
-        <span className="truncate max-w-[180px] lg:max-w-[280px]">
-          Scene {activeSceneNumber} {activeSceneHeading ? `• ${activeSceneHeading}` : ''}
-        </span>
-      </div>
+      {user && activeProject && totalScenesCount > 0 && (
+        <div className="hidden md:flex items-center space-x-2 text-txtSecondary font-mono text-[11px]">
+          <span className="w-2 h-2 rounded-full bg-secondary animate-pulse flex-shrink-0" />
+          <span className="truncate max-w-[180px] lg:max-w-[280px]">
+            Scene {activeSceneNumber} {activeSceneHeading ? `• ${activeSceneHeading}` : ''}
+          </span>
+        </div>
+      )}
 
       {/* Right Actions: Sync, Analyze Buttons, Theme Toggle, User Avatar */}
       <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-        <div className="hidden lg:flex items-center space-x-1.5 text-txtSecondary text-[11px] font-medium">
-          {saveStatus === 'saving' ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 text-tertiary animate-spin" />
-              <span className="text-tertiary font-semibold">Saving...</span>
-            </>
-          ) : saveStatus === 'unsaved' ? (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-              <span className="text-tertiary font-semibold">Unsaved</span>
-            </>
-          ) : (
-            <>
-              <Check className="w-3.5 h-3.5 text-secondary" />
-              <span>Saved</span>
-            </>
-          )}
-        </div>
+        {user && activeProject && (
+          <>
+            <div className="hidden lg:flex items-center space-x-1.5 text-txtSecondary text-[11px] font-medium">
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 text-tertiary animate-spin" />
+                  <span className="text-tertiary font-semibold">Saving...</span>
+                </>
+              ) : saveStatus === 'unsaved' ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                  <span className="text-tertiary font-semibold">Unsaved</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5 text-secondary" />
+                  <span>Saved</span>
+                </>
+              )}
+            </div>
 
-        {/* Stale Analysis Warning Badge */}
-        {isStale && (
-          <span className="px-2 py-0.5 rounded-full bg-tertiary/20 border border-tertiary/40 text-tertiary text-[10px] font-mono font-bold animate-pulse flex items-center space-x-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-            <span>Stale Text</span>
-          </span>
-        )}
+            {/* Stale Analysis Warning Badge */}
+            {isStale && (
+              <span className="px-2 py-0.5 rounded-full bg-tertiary/20 border border-tertiary/40 text-tertiary text-[10px] font-mono font-bold animate-pulse flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                <span>Stale Text</span>
+              </span>
+            )}
 
-        {/* Analyze Active Scene Button */}
-        <button
-          onClick={onAnalyzeScene}
-          disabled={analyzing}
-          className="px-3.5 py-1.5 rounded-lg text-white font-bold flex items-center space-x-1.5 shadow-sm transition-all disabled:opacity-50 text-[11px] bg-amber-500 hover:bg-amber-600 active:bg-amber-700"
-          title="Analyze active scene with unified Script Supervisor pipeline"
-        >
-          <Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : ''}`} />
-          <span>{analyzing ? (batchProgress ? `Sc. ${batchProgress.current}/${batchProgress.total}` : 'Analyzing...') : isStale ? 'Re-Analyze Scene' : 'Analyze Scene'}</span>
-        </button>
+            {/* Analyze Active Scene Button */}
+            <button
+              onClick={onAnalyzeScene}
+              disabled={analyzing || totalScenesCount === 0}
+              className="px-3.5 py-1.5 rounded-lg text-white font-bold flex items-center space-x-1.5 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[11px] bg-amber-500 hover:bg-amber-600 active:bg-amber-700"
+              title={totalScenesCount === 0 ? "No scenes available to analyze" : "Analyze active scene with unified Script Supervisor pipeline"}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : ''}`} />
+              <span>{analyzing ? (batchProgress ? `Sc. ${batchProgress.current}/${batchProgress.total}` : 'Analyzing...') : isStale ? 'Re-Analyze Scene' : 'Analyze Scene'}</span>
+            </button>
 
-        {/* Analyze All Scenes / Stop Analysis Button */}
-        {analyzing && batchProgress ? (
-          <button
-            onClick={onStopAnalysis}
-            className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold flex items-center space-x-1.5 transition-all text-[11px] animate-pulse cursor-pointer shadow-sm"
-            title="Stop batch scene analysis midway"
-          >
-            <Square className="w-3.5 h-3.5 fill-current" />
-            <span>Stop ({batchProgress.current}/{batchProgress.total})</span>
-          </button>
-        ) : (
-          <button
-            onClick={onAnalyzeAllScenes}
-            disabled={analyzing}
-            className="px-2.5 py-1.5 rounded-lg bg-cardHover border border-border hover:border-secondary text-txtPrimary font-semibold flex items-center space-x-1.5 transition-all disabled:opacity-50 text-[11px]"
-            title={`Sequentially analyze all ${totalScenesCount} scenes in project`}
-          >
-            <PlayCircle className="w-3.5 h-3.5 text-secondary" />
-            <span className="hidden sm:inline">Analyze All ({totalScenesCount})</span>
-          </button>
+            {/* Analyze All Scenes / Stop Analysis Button */}
+            {analyzing && batchProgress ? (
+              <button
+                onClick={onStopAnalysis}
+                className="px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold flex items-center space-x-1.5 transition-all text-[11px] animate-pulse cursor-pointer shadow-sm"
+                title="Stop batch scene analysis midway"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" />
+                <span>Stop ({batchProgress.current}/{batchProgress.total})</span>
+              </button>
+            ) : (
+              <button
+                onClick={onAnalyzeAllScenes}
+                disabled={analyzing || totalScenesCount === 0}
+                className="px-2.5 py-1.5 rounded-lg bg-cardHover border border-border hover:border-secondary text-txtPrimary font-semibold flex items-center space-x-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[11px]"
+                title={totalScenesCount === 0 ? "No scenes available to analyze" : `Sequentially analyze all ${totalScenesCount} scenes in project`}
+              >
+                <PlayCircle className="w-3.5 h-3.5 text-secondary" />
+                <span className="hidden sm:inline">Analyze All ({totalScenesCount})</span>
+              </button>
+            )}
+          </>
         )}
 
         {/* How It Works / About Button */}
@@ -429,8 +450,44 @@ export default function HeaderNav({
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-tertiary" /> : <Moon className="w-4 h-4 text-secondary" />}
         </button>
+
+        {/* User Account / Auth Actions */}
+        {user ? (
+          <div className="flex items-center space-x-1.5 pl-1.5 border-l border-border">
+            <div
+              className="flex items-center space-x-1.5 px-2 py-1 bg-cardHover border border-border rounded-lg text-txtPrimary font-semibold text-[11px]"
+              title={`Logged in as ${user.username}`}
+            >
+              <UserIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span className="truncate max-w-[100px]">{user.username}</span>
+            </div>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded-lg bg-cardHover border border-border text-txtSecondary hover:text-red-500 transition-colors"
+              title="Log Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAuthModal(true)}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center space-x-1.5 transition-all text-[11px] shadow-sm ml-1"
+            title="Log In or Sign Up"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Log In</span>
+          </button>
+        )}
       </div>
     </header>
+
+    {/* Auth Modal */}
+    <AuthModal
+      isOpen={showAuthModal}
+      onClose={() => setShowAuthModal(false)}
+      theme={theme}
+    />
 
     {/* About / How It Works Modal */}
     <AboutModal 

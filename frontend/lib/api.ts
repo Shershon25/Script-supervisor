@@ -1,5 +1,17 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export interface User {
+  id: string;
+  username: string;
+  created_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -149,7 +161,7 @@ export interface StoryStateResponse {
   knowledge_states: KnowledgeStateItem[];
 }
 
-// --- Day 3 & Day 4 Continuity Issue Interfaces ---
+// --- Continuity Issue Interfaces ---
 
 export interface IssueEvidence {
   scene_id: string;
@@ -201,7 +213,7 @@ export interface IssueSummaryResponse {
   info: number;
 }
 
-// --- Day 5 External Claims & Research Interfaces ---
+// --- External Claims & Research Interfaces ---
 
 export interface ClaimResponse {
   id: string;
@@ -265,7 +277,7 @@ export interface ResearchTaskResponse {
   updated_at: string;
 }
 
-// --- Day 6 Hybrid Retrieval & Reasoning Interfaces ---
+// --- Hybrid Retrieval & Reasoning Interfaces ---
 
 export interface RetrievedItem {
   item_type: 'FACT' | 'EVENT' | 'RELATIONSHIP' | 'KNOWLEDGE' | 'WRITER_DECISION' | 'RESEARCH' | 'SCENE' | string;
@@ -307,7 +319,7 @@ export interface AnalyzeResponse {
   issues?: IssueResponse[];
 }
 
-// --- Day 7 Unified Script Supervisor Interfaces ---
+// --- Unified Script Supervisor Interfaces ---
 
 export interface UnifiedAnalysisRunSummary {
   entities_count: number;
@@ -334,6 +346,11 @@ export interface UnifiedAnalysisResponse {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
+  if (response.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+    }
+  }
   if (!response.ok) {
     let errorDetail = 'An unexpected error occurred';
     try {
@@ -347,8 +364,47 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+function getAuthHeaders(headers?: HeadersInit): Headers {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const h = new Headers(headers || {});
+  if (token && !h.has('Authorization')) {
+    h.set('Authorization', `Bearer ${token}`);
+  }
+  return h;
+}
+
+async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = getAuthHeaders(init.headers);
+  return fetch(url, { ...init, headers });
+}
+
+// --- Auth API ---
+
+export async function registerUser(username: string, password: string): Promise<TokenResponse> {
+  const res = await fetch(`${API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse<TokenResponse>(res);
+}
+
+export async function loginUser(username: string, password: string): Promise<TokenResponse> {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse<TokenResponse>(res);
+}
+
+export async function getAuthUser(): Promise<User> {
+  const res = await authFetch(`${API_URL}/api/auth/me`);
+  return handleResponse<User>(res);
+}
+
 export async function getHealth(): Promise<{ status: string }> {
-  const res = await fetch(`${API_URL}/api/health`);
+  const res = await authFetch(`${API_URL}/api/health`);
   return handleResponse<{ status: string }>(res);
 }
 
@@ -356,17 +412,17 @@ export async function resetDb(projectId?: string): Promise<{ status: string; mes
   const url = projectId 
     ? `${API_URL}/api/reset-db?project_id=${encodeURIComponent(projectId)}`
     : `${API_URL}/api/reset-db`;
-  const res = await fetch(url, { method: 'DELETE' });
+  const res = await authFetch(url, { method: 'DELETE' });
   return handleResponse<{ status: string; message: string }>(res);
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const res = await fetch(`${API_URL}/api/projects`);
+  const res = await authFetch(`${API_URL}/api/projects`);
   return handleResponse<Project[]>(res);
 }
 
 export async function createProject(title: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects`, {
+  const res = await authFetch(`${API_URL}/api/projects`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
@@ -375,19 +431,19 @@ export async function createProject(title: string): Promise<Project> {
 }
 
 export async function getProject(id: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects/${id}`);
+  const res = await authFetch(`${API_URL}/api/projects/${id}`);
   return handleResponse<Project>(res);
 }
 
 export async function deleteProject(id: string): Promise<{ status: string; message: string }> {
-  const res = await fetch(`${API_URL}/api/projects/${id}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${id}`, {
     method: 'DELETE',
   });
   return handleResponse<{ status: string; message: string }>(res);
 }
 
 export async function renameProject(id: string, title: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects/${id}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
@@ -396,7 +452,7 @@ export async function renameProject(id: string, title: string): Promise<Project>
 }
 
 export async function listScenes(projectId: string): Promise<Scene[]> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/scenes`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes`);
   return handleResponse<Scene[]>(res);
 }
 
@@ -405,7 +461,7 @@ export async function updateSceneText(
   sceneId: string,
   rawText: string
 ): Promise<Scene> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ raw_text: rawText }),
@@ -418,7 +474,7 @@ export async function analyzeScene(
   sceneNumber: number,
   rawText: string
 ): Promise<AnalyzeResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/scenes`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ scene_number: sceneNumber, raw_text: rawText }),
@@ -430,14 +486,14 @@ export async function analyzeUnifiedScene(
   projectId: string,
   sceneId: string
 ): Promise<UnifiedAnalysisResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analyze`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analyze`, {
     method: 'POST'
   });
   return handleResponse<UnifiedAnalysisResponse>(res);
 }
 
 export async function getStoryState(projectId: string): Promise<StoryStateResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/story-state`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/story-state`);
   return handleResponse<StoryStateResponse>(res);
 }
 
@@ -450,17 +506,17 @@ export async function listIssues(
   if (statusFilter) params.append('status', statusFilter);
   if (severityFilter) params.append('severity', severityFilter);
 
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/issues?${params.toString()}`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/issues?${params.toString()}`);
   return handleResponse<IssueResponse[]>(res);
 }
 
 export async function getIssueSummary(projectId: string): Promise<IssueSummaryResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/issues/summary`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/issues/summary`);
   return handleResponse<IssueSummaryResponse>(res);
 }
 
 export async function getIssue(projectId: string, issueId: string): Promise<IssueResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}`);
   return handleResponse<IssueResponse>(res);
 }
 
@@ -471,7 +527,7 @@ export async function reviewIssue(
   resolutionType?: string,
   note?: string
 ): Promise<{ issue: IssueResponse; review: IssueReviewResponse }> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}/review`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}/review`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -484,11 +540,11 @@ export async function reviewIssue(
 }
 
 export async function getIssueHistory(projectId: string, issueId: string): Promise<IssueReviewResponse[]> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}/history`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/issues/${issueId}/history`);
   return handleResponse<IssueReviewResponse[]>(res);
 }
 
-// --- Day 5 Claims & Research API ---
+// --- Claims & Research API ---
 
 export async function listClaims(
   projectId: string,
@@ -501,7 +557,7 @@ export async function listClaims(
   if (statusFilter) params.append('status', statusFilter);
   if (requiresResearch !== undefined) params.append('requires_research', String(requiresResearch));
 
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/claims?${params.toString()}`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/claims?${params.toString()}`);
   return handleResponse<ClaimResponse[]>(res);
 }
 
@@ -510,7 +566,7 @@ export async function triggerResearch(
   claimId: string,
   forceRefresh: boolean = false
 ): Promise<{ status: string; task_id: string; verdict: string; confidence: number; summary: string }> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/claims/${claimId}/research?force_refresh=${forceRefresh}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/claims/${claimId}/research?force_refresh=${forceRefresh}`, {
     method: 'POST'
   });
   return handleResponse<{ status: string; task_id: string; verdict: string; confidence: number; summary: string }>(res);
@@ -520,18 +576,18 @@ export async function getResearchTask(
   projectId: string,
   researchTaskId: string
 ): Promise<ResearchTaskResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/research/${researchTaskId}`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/research/${researchTaskId}`);
   return handleResponse<ResearchTaskResponse>(res);
 }
 
 export async function listResearchTasks(
   projectId: string
 ): Promise<ResearchTaskResponse[]> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/research`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/research`);
   return handleResponse<ResearchTaskResponse[]>(res);
 }
 
-// --- Day 6 Context Retrieval & AI Reasoning API ---
+// --- Context Retrieval & AI Reasoning API ---
 
 export async function retrieveContext(
   projectId: string,
@@ -539,7 +595,7 @@ export async function retrieveContext(
   taskType: string = 'CONTINUITY',
   entityNames: string[] = []
 ): Promise<RetrievalResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/retrieve-context`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/retrieve-context`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ scene_id: sceneId, task_type: taskType, entity_names: entityNames })
@@ -554,7 +610,7 @@ export async function runReasoning(
   targetEntityNames: string[] = [],
   question?: string
 ): Promise<ReasoningResult> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/reason`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/reason`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -589,12 +645,12 @@ export interface TimelineViewResponse {
 }
 
 export async function getTimeline(projectId: string): Promise<TimelineViewResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/timeline`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/timeline`);
   return handleResponse<TimelineViewResponse>(res);
 }
 
 export async function extractTimeline(projectId: string): Promise<TimelineViewResponse> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/timeline/extract`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/timeline/extract`, {
     method: 'POST'
   });
   return handleResponse<TimelineViewResponse>(res);
@@ -624,7 +680,7 @@ export interface ProjectSettings {
 }
 
 export async function getProjectSettings(projectId: string): Promise<ProjectSettings> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/settings`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/settings`);
   return handleResponse<ProjectSettings>(res);
 }
 
@@ -634,7 +690,7 @@ export async function updateProjectSettings(
   continuityStrictness?: number,
   autoBackgroundAnalysisEnabled?: boolean
 ): Promise<ProjectSettings> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/settings`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -651,7 +707,7 @@ export async function createWorldRule(
   ruleText: string,
   active: boolean = true
 ): Promise<StoryWorldRule> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/settings/world-rules`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/settings/world-rules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rule_text: ruleText, active })
@@ -665,7 +721,7 @@ export async function updateWorldRule(
   ruleText?: string,
   active?: boolean
 ): Promise<StoryWorldRule> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/settings/world-rules/${ruleId}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/settings/world-rules/${ruleId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rule_text: ruleText, active })
@@ -677,7 +733,7 @@ export async function deleteWorldRule(
   projectId: string,
   ruleId: string
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/settings/world-rules/${ruleId}`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/settings/world-rules/${ruleId}`, {
     method: 'DELETE'
   });
   if (!res.ok) {
@@ -734,7 +790,7 @@ export async function uploadDocumentForPreview(
 ): Promise<ImportPreview> {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/documents/import`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/documents/import`, {
     method: 'POST',
     body: formData
   });
@@ -746,7 +802,7 @@ export async function confirmDocumentImport(
   documentId: string,
   mode: 'append' | 'replace' = 'append'
 ): Promise<{ message: string; document_id: string; scenes_imported: number }> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/documents/${documentId}/confirm-import`, {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/documents/${documentId}/confirm-import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mode })
@@ -757,7 +813,7 @@ export async function confirmDocumentImport(
 export async function listImportedDocuments(
   projectId: string
 ): Promise<ImportedDocument[]> {
-  const res = await fetch(`${API_URL}/api/projects/${projectId}/documents`);
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/documents`);
   return handleResponse<ImportedDocument[]>(res);
 }
 
@@ -775,19 +831,26 @@ export function getExportUrl(
   return `${API_URL}/api/projects/${projectId}/export?${params.toString()}`;
 }
 
-export function downloadProjectScript(
+export async function downloadProjectScript(
   projectId: string,
   format: 'pdf' | 'docx' | 'fountain' = 'pdf',
   fontFamily: string = 'Courier',
   fontSize: number = 12
 ) {
   const url = getExportUrl(projectId, format, fontFamily, fontSize);
+  const res = await authFetch(url);
+  if (!res.ok) {
+    throw new Error('Failed to export screenplay document');
+  }
+  const blob = await res.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', '');
+  link.href = downloadUrl;
+  link.setAttribute('download', `screenplay_${projectId}.${format}`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
 }
 
 

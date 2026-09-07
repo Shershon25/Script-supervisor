@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
     
-    # Parallel API settings (Day 5 External Research)
+    # Parallel API settings (External Research)
     PARALLEL_API_KEY: str = ""
     
     # Document Import Limits
@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     MAX_ANALYSES_PER_IP_PER_DAY: int = 50
     MAX_RESEARCH_REQUESTS_PER_IP_PER_DAY: int = 20
     MAX_IMPORTS_PER_IP_PER_DAY: int = 10
+
+    # JWT Authentication Configuration
+    JWT_SECRET_KEY: str = "agentic_cinema_secret_key_2026_super_secure_jwt_token_key"
+    JWT_ACCESS_TOKEN_EXPIRE_DAYS: int = 7
     
     model_config = SettingsConfigDict(
         env_file=str(root_env) if root_env.exists() else ".env",

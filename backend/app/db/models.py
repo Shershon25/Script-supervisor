@@ -13,15 +13,30 @@ def generate_uuid():
 def utc_now():
     return datetime.now(timezone.utc)
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    username = Column(String(100), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    # Relationships
+    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     # Relationships
+    user = relationship("User", back_populates="projects")
     scenes = relationship("Scene", back_populates="project", cascade="all, delete-orphan", order_by="Scene.scene_number")
     entities = relationship("Entity", back_populates="project", cascade="all, delete-orphan")
     facts = relationship("Fact", back_populates="project", cascade="all, delete-orphan")
@@ -216,7 +231,7 @@ class Issue(Base):
     status = Column(String(20), default="OPEN", nullable=False)  # OPEN | ACCEPTED | IGNORED | RESOLVED
     evidence_json = Column(JSON, default=list, nullable=False)
     
-    # Day 4 Human-in-the-Loop Review Fields
+    # Human-in-the-Loop Review Fields
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     reviewed_by = Column(String(50), default="writer", nullable=True)
     resolution_type = Column(String(50), nullable=True)  # INTENTIONAL | FIXED | FALSE_POSITIVE | ACCEPTED_AS_IS | NEEDS_REVIEW
