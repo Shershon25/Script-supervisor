@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project } from '@/lib/api';
 
-import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Download, Trash2, Square, Pencil } from 'lucide-react';
+import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Download, Trash2, Square, Pencil, HelpCircle } from 'lucide-react';
 import ImportScreenplayModal from '@/components/Import/ImportScreenplayModal';
 import ExportScreenplayModal from '@/components/Export/ExportScreenplayModal';
+import { AboutModal } from '@/components/About/AboutModal';
 
 interface Props {
   projects: Project[];
@@ -60,6 +61,7 @@ export default function HeaderNav({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [projectToRename, setProjectToRename] = useState<Project | null>(null);
@@ -409,17 +411,15 @@ export default function HeaderNav({
           </button>
         )}
 
-        {/* 1-Click Export Button */}
-        {activeProject && (
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="px-2.5 py-1.5 rounded-lg bg-cardHover border border-border hover:border-emerald-500 text-txtPrimary font-semibold flex items-center space-x-1.5 transition-all text-[11px]"
-            title="Export screenplay project as PDF, Word (.docx), or Fountain"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
-        )}
+        {/* How It Works / About Button */}
+        <button
+          onClick={() => setShowAboutModal(true)}
+          className="px-2.5 py-1.5 rounded-lg bg-cardHover border border-border hover:border-blue-500 text-txtPrimary font-semibold flex items-center space-x-1.5 transition-all text-[11px]"
+          title="How Script Supervisor works"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+          <span className="hidden sm:inline">How It Works</span>
+        </button>
 
         {/* Dark/Light Theme Switcher */}
         <button
@@ -431,6 +431,13 @@ export default function HeaderNav({
         </button>
       </div>
     </header>
+
+    {/* About / How It Works Modal */}
+    <AboutModal 
+      isOpen={showAboutModal} 
+      onClose={() => setShowAboutModal(false)} 
+      theme={theme} 
+    />
 
     {/* Create Project Modal (Portaled directly to document.body for true viewport centering) */}
     {showCreateModal && mounted && createPortal(
