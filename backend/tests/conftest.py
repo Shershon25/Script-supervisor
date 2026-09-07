@@ -32,6 +32,10 @@ def override_get_db():
     finally:
         db.close()
 
+import app.db.database as db_module
+db_module.engine = test_engine
+db_module.SessionLocal = TestingSessionLocal
+
 app.dependency_overrides[get_db] = override_get_db
 
 from app.services.rate_limiter import limiter

@@ -153,5 +153,5 @@ def test_imported_scene_analyzed_by_existing_pipeline():
     analyze_res = client.post(f"/api/projects/{p['id']}/scenes/{imported_scene_id}/analyze")
     assert analyze_res.status_code == 200
     ana_data = analyze_res.json()
-    assert ana_data["scene_id"] == imported_scene_id
-    assert "status" in ana_data
+    assert ana_data["scene"]["id"] == imported_scene_id
+    assert "analysis" in ana_data

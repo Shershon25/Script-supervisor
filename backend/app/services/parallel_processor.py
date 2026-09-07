@@ -22,8 +22,17 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
     """
     logger.info(f"Running parallel downstream analysis for scene #{scene.scene_number} (max_workers=3)")
 
+    try:
+        db.flush()
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Notice on pre-parallel flush/commit: {e}")
+
+    from sqlalchemy.orm import sessionmaker
+    WorkerSessionMaker = sessionmaker(bind=db.get_bind())
+
     def task_continuity() -> List[Any]:
-        with SessionLocal() as worker_db:
+        with WorkerSessionMaker() as worker_db:
             try:
                 return check_scene_continuity(worker_db, project_id, scene.id)
             except Exception as e:
@@ -31,7 +40,7 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
                 return []
 
     def task_claims():
-        with SessionLocal() as worker_db:
+        with WorkerSessionMaker() as worker_db:
             try:
                 worker_scene = worker_db.query(Scene).filter(Scene.id == scene.id).first()
                 if worker_scene:
@@ -40,7 +49,7 @@ def execute_scene_downstream_tasks_parallel(db: Session, project_id: str, scene:
                 logger.warning(f"Notice on claim processing for scene #{scene.scene_number}: {e}")
 
     def task_timeline():
-        with SessionLocal() as worker_db:
+        with WorkerSessionMaker() as worker_db:
             try:
                 prev_events = worker_db.query(PlotEvent).filter(
                     PlotEvent.project_id == project_id,

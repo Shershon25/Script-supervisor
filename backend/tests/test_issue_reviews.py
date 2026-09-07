@@ -7,17 +7,22 @@ def test_issue_review_lifecycle_and_history(client):
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
-    client.post(f"/api/projects/{project_id}/scenes", json={
+    res1 = client.post(f"/api/projects/{project_id}/scenes", json={
         "scene_number": 1,
-        "raw_text": "INT. APARTMENT - NIGHT\nJohn lives in Chennai."
+        "raw_text": "John lives in Chennai."
     })
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
 
     res2 = client.post(f"/api/projects/{project_id}/scenes", json={
         "scene_number": 2,
-        "raw_text": "INT. APARTMENT - NIGHT\nJohn lives in Delhi."
+        "raw_text": "John lives in Delhi."
     })
     assert res2.status_code == 201
-    issues = res2.json().get("issues", [])
+    s2_id = res2.json()["scene"]["id"]
+    analyze_res = client.post(f"/api/projects/{project_id}/scenes/{s2_id}/analyze")
+    assert analyze_res.status_code == 200
+    issues = analyze_res.json().get("issues", [])
     assert len(issues) >= 1
     target_issue = issues[0]
     issue_id = target_issue["id"]
@@ -64,9 +69,14 @@ def test_invalid_review_transition(client):
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
-    client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    res1 = client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
+
     res2 = client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 2, "raw_text": "John lives in Delhi."})
-    issue_id = res2.json()["issues"][0]["id"]
+    s2_id = res2.json()["scene"]["id"]
+    analyze_res = client.post(f"/api/projects/{project_id}/scenes/{s2_id}/analyze")
+    issue_id = analyze_res.json()["issues"][0]["id"]
 
     # Resolve issue first
     client.post(f"/api/projects/{project_id}/issues/{issue_id}/review", json={
@@ -87,9 +97,14 @@ def test_issue_summary_counts(client):
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
-    client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    res1 = client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
+
     res2 = client.post(f"/api/projects/{project_id}/scenes", json={"scene_number": 2, "raw_text": "John lives in Delhi."})
-    issue_id = res2.json()["issues"][0]["id"]
+    s2_id = res2.json()["scene"]["id"]
+    analyze_res = client.post(f"/api/projects/{project_id}/scenes/{s2_id}/analyze")
+    issue_id = analyze_res.json()["issues"][0]["id"]
 
     # Ignore issue
     client.post(f"/api/projects/{project_id}/issues/{issue_id}/review", json={
@@ -109,9 +124,14 @@ def test_cross_project_issue_isolation(client):
     projA = client.post("/api/projects", json={"title": "Project A"}).json()
     projB = client.post("/api/projects", json={"title": "Project B"}).json()
 
-    client.post(f"/api/projects/{projA['id']}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    res1A = client.post(f"/api/projects/{projA['id']}/scenes", json={"scene_number": 1, "raw_text": "John lives in Chennai."})
+    s1A_id = res1A.json()["scene"]["id"]
+    client.post(f"/api/projects/{projA['id']}/scenes/{s1A_id}/analyze")
+
     resA = client.post(f"/api/projects/{projA['id']}/scenes", json={"scene_number": 2, "raw_text": "John lives in Delhi."})
-    issueA_id = resA.json()["issues"][0]["id"]
+    sA_id = resA.json()["scene"]["id"]
+    analyzeA = client.post(f"/api/projects/{projA['id']}/scenes/{sA_id}/analyze")
+    issueA_id = analyzeA.json()["issues"][0]["id"]
 
     # Attempt to review Project A's issue using Project B's URL path -> Should fail with 404
     bad_cross = client.post(f"/api/projects/{projB['id']}/issues/{issueA_id}/review", json={

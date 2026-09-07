@@ -46,7 +46,7 @@ def generate_candidates_for_scene(
                 sub_match = (cf.subject_entity.name.lower() == pf.subject.name.lower())
                 pred_norm_cf = cf.predicate.lower().replace("_", " ")
                 pred_norm_pf = pf.predicate.lower().replace("_", " ")
-                possession_set = {"owns", "possesses", "has", "drives", "vehicle", "car", "residence", "lives"}
+                possession_set = {"owns", "possesses", "has", "drives", "vehicle", "car", "residence", "lives", "lives in", "lives_in", "resides", "location", "home", "city"}
                 pred_match = (pred_norm_cf == pred_norm_pf) or (pred_norm_cf in possession_set and pred_norm_pf in possession_set)
                 
                 if sub_match and pred_match:

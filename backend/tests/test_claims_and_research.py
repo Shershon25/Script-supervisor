@@ -12,6 +12,8 @@ def test_claim_classification_types(client):
         "raw_text": "INT. LAB - NIGHT\nIn 2040, teleportation is legal.\nThe police introduced facial recognition in 2014."
     })
     assert res1.status_code == 201
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
 
     claims_res = client.get(f"/api/projects/{project_id}/claims")
     assert claims_res.status_code == 200
@@ -33,6 +35,8 @@ def test_research_execution_and_deduplication(client):
         "raw_text": "INT. APARTMENT - NIGHT\nJohn drove from Pune to Mumbai in twenty minutes."
     })
     assert res1.status_code == 201
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
 
     claims_res = client.get(f"/api/projects/{project_id}/claims?claim_type=REAL_WORLD_CLAIM")
     assert claims_res.status_code == 200
@@ -59,10 +63,12 @@ def test_get_research_task_detail(client):
     assert proj_res.status_code == 201
     project_id = proj_res.json()["id"]
 
-    client.post(f"/api/projects/{project_id}/scenes", json={
+    res1 = client.post(f"/api/projects/{project_id}/scenes", json={
         "scene_number": 1,
         "raw_text": "INT. STATION - NIGHT\nMumbai Central was operational in 2018."
     })
+    s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
 
     claims = client.get(f"/api/projects/{project_id}/claims").json()
     claim_id = claims[0]["id"]

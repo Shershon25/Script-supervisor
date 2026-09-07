@@ -141,6 +141,12 @@ def startup_event():
                 if "source_type" not in columns:
                     conn.execute(text("ALTER TABLE scenes ADD COLUMN source_type VARCHAR(50) DEFAULT 'MANUAL'"))
 
+        if "project_settings" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("project_settings")]
+            with engine.begin() as conn:
+                if "auto_background_analysis_enabled" not in columns:
+                    conn.execute(text("ALTER TABLE project_settings ADD COLUMN auto_background_analysis_enabled BOOLEAN DEFAULT true"))
+
         logger.info("Database schema initialized and verified successfully.")
     except Exception as e:
         logger.warning(f"Notice on database schema initialization: {e}")

@@ -13,6 +13,7 @@ def test_hybrid_retrieval_and_provenance(client):
     })
     assert res1.status_code == 201
     s1_id = res1.json()["scene"]["id"]
+    client.post(f"/api/projects/{project_id}/scenes/{s1_id}/analyze")
 
     # Scene 2: John travels to Mumbai
     res2 = client.post(f"/api/projects/{project_id}/scenes", json={
