@@ -1,18 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ClaimResponse, ResearchTaskResponse, listClaims, listResearchTasks } from '@/lib/api';
-import { Globe, ExternalLink, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { ClaimResponse, ResearchTaskResponse, listClaims, listResearchTasks, triggerResearch, getResearchTask } from '@/lib/api';
+import { Globe, ExternalLink, ChevronDown, ChevronRight, CheckCircle2, XCircle, AlertTriangle, Search, Loader2 } from 'lucide-react';
 
-interface Props {
-  projectId: string;
-  onSelectSceneNumber?: (sceneNum: number) => void;
+function cleanResearchText(text?: string): string {
+  if (!text) return '';
+  return text
+    .replace(/Source\s+[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\s*/gi, '')
+    .replace(/Source\s+ID\s*:\s*[a-f0-9-]{36}\s*/gi, '')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export default function ResearchView({ projectId, onSelectSceneNumber }: Props) {
+
   const [claims, setClaims] = useState<ClaimResponse[]>([]);
   const [tasksMap, setTasksMap] = useState<Record<string, ResearchTaskResponse>>({});
   const [loading, setLoading] = useState(true);
+  const [researchingClaimId, setResearchingClaimId] = useState<string | null>(null);
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -31,8 +40,9 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Props) 
       setClaims(realWorldClaims);
 
       const map: Record<string, ResearchTaskResponse> = {};
+      // Keep latest task per claim (tasksData is ordered desc by created_at)
       tasksData.forEach(t => {
-        if (t.claim_id) {
+        if (t.claim_id && !map[t.claim_id]) {
           map[t.claim_id] = t;
         }
       });
@@ -41,6 +51,24 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Props) 
       console.error("Error fetching research claims", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRunResearch = async (claimId: string) => {
+    setResearchingClaimId(claimId);
+    try {
+      const res = await triggerResearch(projectId, claimId, true);
+      if (res.task_id) {
+        const taskData = await getResearchTask(projectId, res.task_id);
+        setTasksMap(prev => ({ ...prev, [claimId]: taskData }));
+      }
+      const updatedClaims = await listClaims(projectId);
+      const realWorldClaims = updatedClaims.filter(c => c.claim_type === 'REAL_WORLD_CLAIM' && c.requires_research);
+      setClaims(realWorldClaims);
+    } catch (err: any) {
+      alert(err.message || 'Failed to fetch web research sources');
+    } finally {
+      setResearchingClaimId(null);
     }
   };
 
@@ -73,11 +101,12 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Props) 
     <div className="flex-1 overflow-y-auto min-h-0 space-y-3 text-xs pr-1">
       {claims.map((claim) => {
         const task = tasksMap[claim.id];
-        const evaluation = task?.evaluation;
-        const sources = task?.sources || [];
+        const evaluation = task?.evaluation || claim.evaluation;
+        const sources = (task?.sources && task.sources.length > 0) ? task.sources : (claim.sources || []);
         const primarySource = sources[0];
         const additionalSources = sources.slice(1);
         const isExpanded = !!expandedSources[claim.id];
+        const isResearching = researchingClaimId === claim.id;
 
         return (
           <div key={claim.id} className="p-3 rounded-xl bg-card border border-border space-y-2.5 shadow-sm">
@@ -120,92 +149,92 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Props) 
               "{claim.claim_text}"
             </h5>
 
+            {/* Subtle state indicator when evaluation/sources not yet available */}
+            {!evaluation && sources.length === 0 && (
+              <div className="p-2 rounded-lg bg-card/60 border border-border/40 text-[10px] text-txtMuted font-mono flex items-center justify-between">
+                <span>Web evidence pending analysis</span>
+                <button
+                  onClick={() => handleRunResearch(claim.id)}
+                  disabled={isResearching}
+                  className="text-blue-500 hover:underline flex items-center space-x-1 font-bold"
+                >
+                  {isResearching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                  <span>Run Search</span>
+                </button>
+              </div>
+            )}
+
             {/* Evidence & Reasoning Section */}
-            {evaluation && (
+            {(evaluation || sources.length > 0) && (
               <div className="p-2.5 rounded-lg bg-background/60 border border-border/80 space-y-2 text-[11px]">
                 <div className="flex items-center justify-between text-[10px] font-mono border-b border-border/40 pb-1">
                   <span className="font-bold text-secondary flex items-center space-x-1">
                     <Globe className="w-3 h-3 text-secondary" />
                     <span>Parallel Research Evidence</span>
                   </span>
-                  <span className="text-txtMuted font-mono">
-                    {Math.round((evaluation.confidence || 0.9) * 100)}% Confidence
-                  </span>
+                  {evaluation && (
+                    <span className="text-txtMuted font-mono">
+                      {Math.round((evaluation.confidence || 0.9) * 100)}% Confidence
+                    </span>
+                  )}
                 </div>
 
-                <p className="text-txtSecondary leading-relaxed text-[11px]">
-                  {evaluation.reasoning || evaluation.summary}
-                </p>
-
-                {/* Primary Source Evidence Card */}
-                {primarySource && (
-                  <div className="space-y-1 pt-1">
-                    <span className="text-[10px] font-bold text-txtMuted uppercase tracking-wider block">
-                      Primary Web Source:
-                    </span>
-                    <div className="p-2 rounded bg-card/80 border border-border/60 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <a
-                          href={primarySource.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-bold text-accent-light hover:underline flex items-center space-x-1 text-[11px] truncate"
-                        >
-                          <span className="truncate">{primarySource.title}</span>
-                          <ExternalLink className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                        </a>
-                        <span className="text-[9px] font-mono text-txtMuted px-1.5 py-0.5 rounded bg-background flex-shrink-0">
-                          {primarySource.domain}
-                        </span>
-                      </div>
-                      {primarySource.excerpt && (
-                        <p className="text-[10px] text-txtSecondary font-mono italic leading-normal bg-background/50 p-1.5 rounded border border-border/30">
-                          "{primarySource.excerpt}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                {evaluation && (
+                  <p className="text-txtSecondary leading-relaxed text-[11px]">
+                    {cleanResearchText(evaluation.summary || evaluation.reasoning)}
+                  </p>
                 )}
 
-                {/* Collapsible Additional Sources List */}
-                {additionalSources.length > 0 && (
-                  <div className="pt-1">
-                    <button
-                      onClick={() => toggleExpanded(claim.id)}
-                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center space-x-1 transition-colors py-0.5"
+                {/* Primary Source Link & Collapsible Additional Sources */}
+                {primarySource && (
+                  <div className="space-y-1.5 pt-2 border-t border-border/40">
+                    <span className="text-[10px] font-bold text-txtMuted uppercase tracking-wider block">
+                      Primary Source:
+                    </span>
+                    <a
+                      href={primarySource.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold text-blue-400 hover:text-blue-300 hover:underline flex items-center space-x-1.5 text-[11px] truncate bg-card/60 p-1.5 rounded-lg border border-border/50"
                     >
-                      {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                      <span>
-                        {isExpanded ? 'Hide' : 'Show'} {additionalSources.length} additional web {additionalSources.length === 1 ? 'source' : 'sources'}
+                      <span className="truncate">{cleanResearchText(primarySource.title) || primarySource.domain || 'Primary Source Link'}</span>
+                      <ExternalLink className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                      <span className="text-[9px] font-mono text-txtMuted px-1.5 py-0.5 rounded bg-background flex-shrink-0 border border-border/40 ml-auto">
+                        {primarySource.domain}
                       </span>
-                    </button>
+                    </a>
 
-                    {isExpanded && (
-                      <div className="mt-1.5 space-y-1.5 pl-1.5 border-l-2 border-blue-500/30">
-                        {additionalSources.map((src) => (
-                          <div key={src.id} className="text-[10px] space-y-0.5">
-                            <div className="flex items-center space-x-1.5">
-                              <span className="text-blue-400 font-bold">•</span>
+                    {additionalSources.length > 0 && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() => toggleExpanded(claim.id)}
+                          className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center space-x-1 transition-colors py-0.5"
+                        >
+                          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          <span>
+                            {isExpanded ? 'Hide' : 'Show'} {additionalSources.length} additional {additionalSources.length === 1 ? 'source' : 'sources'}
+                          </span>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-1.5 space-y-1.5 pl-1.5 border-l-2 border-blue-500/30">
+                            {additionalSources.map((src) => (
                               <a
+                                key={src.id || src.url}
                                 href={src.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="font-semibold text-accent-light hover:underline flex items-center space-x-1 truncate"
+                                className="font-semibold text-blue-400 hover:text-blue-300 hover:underline flex items-center space-x-1.5 text-[10px] truncate bg-card/40 p-1 rounded-md border border-border/40"
                               >
-                                <span className="truncate">{src.title}</span>
-                                <ExternalLink className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                                <span className="truncate">{cleanResearchText(src.title) || src.domain || 'Source Link'}</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                                <span className="text-[9px] font-mono text-txtMuted px-1 py-0.2 rounded bg-background flex-shrink-0 border border-border/30 ml-auto">
+                                  {src.domain}
+                                </span>
                               </a>
-                              <span className="text-[9px] font-mono text-txtMuted px-1 rounded bg-background flex-shrink-0">
-                                {src.domain}
-                              </span>
-                            </div>
-                            {src.excerpt && (
-                              <p className="text-[9px] text-txtMuted font-mono italic pl-3 leading-tight">
-                                "{src.excerpt}"
-                              </p>
-                            )}
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
@@ -214,7 +243,10 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Props) 
             )}
           </div>
         );
+
+
       })}
+
     </div>
   );
 }

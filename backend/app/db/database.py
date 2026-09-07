@@ -28,9 +28,12 @@ Base = declarative_base()
 
 def get_engine(db_url: str):
     connect_args = {}
+    kwargs = {"pool_pre_ping": True}
     if db_url.startswith("sqlite"):
         connect_args = {"check_same_thread": False, "timeout": 30}
-    return create_engine(db_url, connect_args=connect_args, pool_pre_ping=True)
+    elif db_url.startswith("postgresql") or db_url.startswith("postgres"):
+        kwargs["isolation_level"] = "READ COMMITTED"
+    return create_engine(db_url, connect_args=connect_args, **kwargs)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 

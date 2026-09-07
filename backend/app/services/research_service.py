@@ -213,13 +213,9 @@ IMPORTANT DISTINCTIONS
 EVIDENCE
 
 Every conclusion must be grounded in the supplied sources.
-
-For each source used:
-- cite its exact source_id
-- explain briefly what it establishes
-- distinguish supporting evidence from contradicting evidence
-
-Do not cite sources that do not materially contribute to the evaluation.
+Write clean, natural, writer-friendly text for screenwriters.
+DO NOT mention internal UUIDs, database keys, or raw source IDs (like "Source 9cc898f9...") in the summary or reasoning text.
+Refer to sources naturally by domain or publication name (e.g., "Historical records show...", "Wikipedia notes...") if needed.
 
 CONFIDENCE
 
@@ -234,11 +230,12 @@ Return valid JSON only:
 {
   "verdict": "VERIFIED|LIKELY_TRUE|CONTRADICTED|INCONCLUSIVE|INSUFFICIENT_EVIDENCE",
   "confidence": 0.0,
-  "summary": "One or two sentence writer-friendly conclusion.",
-  "reasoning": "Clear explanation of how the supplied evidence supports, contradicts, or fails to establish the claim.",
+  "summary": "One or two sentence writer-friendly conclusion. Do NOT include source UUIDs.",
+  "reasoning": "Clear explanation of how the evidence supports or refutes the claim. Do NOT include source UUIDs.",
   "supporting_source_ids": ["source_id"],
   "contradicting_source_ids": ["source_id"]
 }
+
 
 FINAL PRINCIPLE
 
@@ -249,15 +246,29 @@ SCREENPLAY CLAIM
 SUPPLIED EXTERNAL EVIDENCE
         ↓
 EVIDENCE-BASED VERDICT
-
-Do not answer:
-"Does this sound realistic?"
-
-Answer:
-"Does the supplied external evidence support or contradict this specific factual claim?"
 """
 
+import re
+
+
+def clean_research_prose(text: str) -> str:
+    if not text:
+        return ""
+    # Strip raw UUID source IDs like "Source 9cc898f9-5705-4dd2-bc70-a0d3543b1a65" or "Source ID: xxx"
+    cleaned = re.sub(r'Source\s+[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\s*', '', text, flags=re.IGNORECASE)
+    cleaned = re.sub(r'Source\s+ID\s*:\s*[a-f0-9-]{36}\s*', '', cleaned, flags=re.IGNORECASE)
+    # Strip markdown headers like "# Route ## History"
+    cleaned = re.sub(r'#{1,6}\s+', '', cleaned)
+    # Strip markdown links [label](url) -> label
+    cleaned = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)
+    # Strip markdown formatting _text_ or *text*
+    cleaned = re.sub(r'[*_]{1,3}([^*_]+)[*_]{1,3}', r'\1', cleaned)
+    # Normalize whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
 def evaluate_evidence_gemini(claim_text: str, sources: List[ResearchResult]) -> Dict[str, Any]:
+
     """Evaluates retrieved web evidence against a screenplay claim using Gemini API."""
     provider = settings.GEMINI_PROVIDER.lower()
     is_vertex = (provider == "vertexai")
@@ -311,11 +322,20 @@ def evaluate_evidence_gemini(claim_text: str, sources: List[ResearchResult]) -> 
 
         if res_text:
             cleaned = res_text.strip()
-            if "```json" in cleaned:
-                cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-            elif "```" in cleaned:
-                cleaned = cleaned.split("```")[1].split("```")[0].strip()
-            return json.loads(cleaned)
+            if cleaned.startswith("```"):
+                lines = cleaned.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, dict):
+                if "summary" in parsed and isinstance(parsed["summary"], str):
+                    parsed["summary"] = clean_research_prose(parsed["summary"])
+                if "reasoning" in parsed and isinstance(parsed["reasoning"], str):
+                    parsed["reasoning"] = clean_research_prose(parsed["reasoning"])
+            return parsed
 
         raise ValueError("Empty response from Gemini research evidence evaluator.")
     except HTTPException:

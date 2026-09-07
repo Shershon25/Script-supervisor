@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import ResearchTask, ResearchResult, ResearchEvaluation, Claim, Scene
+from app.db.models import Project, ResearchTask, ResearchResult, ResearchEvaluation, Claim, Scene
 from app.schemas.research import ResearchTaskResponse, ResearchSourceResponse, ResearchEvaluationResponse
 from app.schemas.claim import ClaimResponse
 

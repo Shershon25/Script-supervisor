@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { IssueResponse } from '@/lib/api';
-import { AlertTriangle, ShieldCheck, Eye, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Eye, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface Props {
   issue: IssueResponse;
@@ -23,6 +23,9 @@ function getSuggestionText(issue: IssueResponse): string {
   if (issue.issue_type.includes('OBJECT') || issue.issue_type.includes('OWNERSHIP')) {
     return `Add an object transfer event (give/take) or update item possession details.`;
   }
+  if (issue.issue_type.includes('REASONING') || issue.issue_type.includes('OBJECT_STATE')) {
+    return `Review narrative continuity for ${issue.title.toLowerCase()}. If intentional, mark as a story decision so the AI does not re-flag it.`;
+  }
   return `Review narrative continuity for ${issue.title.toLowerCase()} or mark as intentional writer choice.`;
 }
 
@@ -35,6 +38,7 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
   const isKnowledge = issue.issue_type.includes('KNOWLEDGE');
   const isLocation = issue.issue_type.includes('LOCATION');
   const isObject = issue.issue_type.includes('OBJECT') || issue.issue_type.includes('OWNERSHIP');
+  const isReasoning = issue.issue_type.includes('REASONING') || issue.issue_type === 'OBJECT_STATE_CONFLICT';
   const isProcedure = issue.issue_type.includes('REALITY') || issue.title.includes('Procedure') || issue.issue_type.includes('RESEARCH');
   const isResolved = issue.status === 'RESOLVED' || issue.status === 'ACCEPTED' || issue.status === 'IGNORED';
 
@@ -78,6 +82,8 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
     ? 'bg-rose-500/5 border-rose-500/30 dark:bg-rose-500/10 dark:border-rose-500/40 shadow-md'
     : isKnowledge || isObject
     ? 'bg-amber-500/5 border-amber-500/30 dark:bg-amber-500/10 dark:border-amber-500/40 shadow-md'
+    : isReasoning
+    ? 'bg-purple-500/5 border-purple-500/30 dark:bg-purple-500/10 dark:border-purple-500/40 shadow-md'
     : 'bg-secondary/10 border-secondary/40 shadow-md';
 
   const badgeClass = isResolved
@@ -86,24 +92,32 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
     ? 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:bg-rose-500/25 dark:border-rose-500/50 dark:text-rose-400 font-bold'
     : isKnowledge || isObject
     ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:bg-amber-500/25 dark:border-amber-500/50 dark:text-amber-400 font-bold'
+    : isReasoning
+    ? 'bg-purple-500/15 border-purple-500/40 text-purple-700 dark:bg-purple-500/25 dark:border-purple-500/50 dark:text-purple-400 font-bold'
     : 'bg-secondary/25 border-secondary/50 text-secondary dark:text-secondary font-bold';
 
   const suggestionBoxClass = isLocation
     ? 'bg-rose-500/10 border-rose-500/30 dark:bg-rose-500/15 dark:border-rose-500/40'
     : isKnowledge || isObject
     ? 'bg-amber-500/10 border-amber-500/30 dark:bg-amber-500/15 dark:border-amber-500/40'
+    : isReasoning
+    ? 'bg-purple-500/10 border-purple-500/30 dark:bg-purple-500/15 dark:border-purple-500/40'
     : 'bg-secondary/15 border-secondary/30';
 
   const suggestionTitleClass = isLocation
     ? 'text-rose-700 dark:text-rose-400'
     : isKnowledge || isObject
     ? 'text-amber-700 dark:text-amber-400'
+    : isReasoning
+    ? 'text-purple-700 dark:text-purple-400'
     : 'text-secondary';
 
   const gapTagClass = isLocation
     ? 'bg-rose-600 text-white'
     : isKnowledge || isObject
     ? 'bg-amber-600 text-white'
+    : isReasoning
+    ? 'bg-purple-600 text-white'
     : 'bg-secondary text-white';
 
   return (
@@ -123,6 +137,8 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
               ? 'Location Conflict'
               : isObject
               ? 'Object Transfer'
+              : isReasoning
+              ? 'Object Continuity'
               : isProcedure
               ? '@ 1985 Procedure'
               : issue.issue_type.replace(/_/g, ' ')}
@@ -154,11 +170,27 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
           <div className="space-y-1.5">
             {issue.evidence.map((ev, idx) => {
               const isGap = idx === issue.evidence.length - 1 && !isResolved;
+              const hasUrl = ev.text && (ev.text.includes('http://') || ev.text.includes('https://'));
+              const urlMatch = hasUrl ? ev.text.match(/https?:\/\/[^\s]+/) : null;
+              const linkUrl = urlMatch ? urlMatch[0] : null;
+
               return (
                 <div key={idx} className={`flex items-center justify-between text-[11px] ${isGap ? 'font-bold' : 'text-txtSecondary'}`}>
-                  <span className="truncate max-w-[190px] text-txtPrimary">
-                    Sc. {ev.scene_number ? String(ev.scene_number).padStart(2, '0') : '??'}: {ev.text}
-                  </span>
+                  {linkUrl ? (
+                    <a
+                      href={linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate max-w-[200px] text-blue-400 hover:underline font-semibold flex items-center space-x-1"
+                    >
+                      <span className="truncate">{ev.text}</span>
+                      <ExternalLink className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="truncate max-w-[190px] text-txtPrimary">
+                      Sc. {ev.scene_number ? String(ev.scene_number).padStart(2, '0') : '??'}: {ev.text}
+                    </span>
+                  )}
                   <div className="flex items-center space-x-1 flex-shrink-0">
                     {ev.scene_number && onSelectSceneNumber && (
                       <button
@@ -179,6 +211,7 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
               );
             })}
           </div>
+
         </div>
       ) : (
         <div className="p-2 rounded-lg bg-card/90 border border-border text-[11px] font-mono text-txtSecondary flex items-center justify-between">

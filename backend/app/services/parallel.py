@@ -41,6 +41,8 @@ def execute_parallel_search(objective: str) -> List[ParallelSource]:
 
     headers = {
         "Authorization": f"Bearer {api_key}",
+        "x-api-key": api_key,
+        "api-key": api_key,
         "Content-Type": "application/json"
     }
 

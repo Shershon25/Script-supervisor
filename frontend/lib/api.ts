@@ -231,6 +231,8 @@ export interface ClaimResponse {
   research_priority: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   status: 'UNVERIFIED' | 'RESEARCH_REQUESTED' | 'VERIFIED' | 'LIKELY_TRUE' | 'CONTRADICTED' | 'INCONCLUSIVE' | 'DISMISSED' | string;
   claim_fingerprint?: string;
+  sources?: ResearchSourceResponse[];
+  evaluation?: ResearchEvaluationResponse;
   created_at: string;
   updated_at: string;
 }

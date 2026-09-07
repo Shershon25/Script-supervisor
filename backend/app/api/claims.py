@@ -34,8 +34,53 @@ def list_claims(
 
     results = query.order_by(Scene.scene_number.asc(), Claim.created_at.desc()).all()
 
+    # Pre-fetch completed research tasks to attach sources & evaluations directly to claims
+    claim_ids = [c.id for c, _ in results]
+    tasks = (
+        db.query(ResearchTask)
+        .filter(ResearchTask.claim_id.in_(claim_ids), ResearchTask.status == "COMPLETED")
+        .order_by(ResearchTask.created_at.desc())
+        .all()
+    ) if claim_ids else []
+
+    task_by_claim = {}
+    for t in tasks:
+        if t.claim_id not in task_by_claim:
+            task_by_claim[t.claim_id] = t
+
     resp = []
     for c, scene_num in results:
+        t = task_by_claim.get(c.id)
+        sources_resp = [
+            {
+                "id": r.id,
+                "research_task_id": r.research_task_id,
+                "title": r.title,
+                "url": r.url,
+                "domain": r.domain,
+                "excerpt": r.excerpt,
+                "relevance_score": r.relevance_score,
+                "retrieved_at": r.retrieved_at.isoformat() if r.retrieved_at else None,
+            }
+            for r in t.results
+        ] if t and t.results else []
+
+        eval_resp = None
+        if t and t.evaluations:
+            e = t.evaluations[0]
+            eval_resp = {
+                "id": e.id,
+                "research_task_id": e.research_task_id,
+                "claim_id": e.claim_id,
+                "verdict": e.verdict,
+                "confidence": e.confidence,
+                "summary": e.summary,
+                "reasoning": e.reasoning,
+                "supporting_source_ids": e.supporting_source_ids_json or [],
+                "contradicting_source_ids": e.contradicting_source_ids_json or [],
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+
         resp.append(ClaimResponse(
             id=c.id,
             project_id=c.project_id,
@@ -52,11 +97,14 @@ def list_claims(
             research_priority=c.research_priority,
             status=c.status,
             claim_fingerprint=c.claim_fingerprint,
+            sources=sources_resp,
+            evaluation=eval_resp,
             created_at=c.created_at,
             updated_at=c.updated_at
         ))
 
     return resp
+
 
 @router.post("/{claim_id}/research")
 def trigger_claim_research(

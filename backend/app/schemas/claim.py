@@ -50,6 +50,8 @@ class ClaimResponse(BaseModel):
     research_priority: str
     status: str
     claim_fingerprint: Optional[str] = None
+    sources: Optional[List[Dict[str, Any]]] = None
+    evaluation: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 

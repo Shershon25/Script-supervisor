@@ -138,7 +138,23 @@ def process_scene(db: Session, project_id: str, scene_number: int, raw_text: str
         # 5. Fact Persistence
         persisted_facts = []
         for extracted_fact in analysis.facts:
-            subj_entity = resolve_or_create_entity(db, project_id, "character", extracted_fact.subject, entity_name_map)
+            # Infer entity type rather than hardcoding "character"
+            norm_subj = normalize_name(extracted_fact.subject)
+            inferred_type = "character"
+            if norm_subj in entity_name_map:
+                inferred_type = entity_name_map[norm_subj].type
+            else:
+                matched_ent = next((e for e in analysis.entities if normalize_name(e.name) == norm_subj), None)
+                if matched_ent:
+                    inferred_type = matched_ent.type
+                elif any(w in norm_subj for w in ("diner", "room", "hospital", "station", "road", "street", "house", "building", "outside", "inside", "pier", "hallway", "car", "vehicle")):
+                    inferred_type = "location"
+                elif any(w in norm_subj for w in ("storm", "rain", "wind", "weather", "snow", "fog", "thunder")):
+                    inferred_type = "environment"
+                elif any(w in norm_subj for w in ("bag", "key", "camera", "insulin", "bottle", "label", "phone", "photo", "picture", "clock", "poster")):
+                    inferred_type = "object"
+
+            subj_entity = resolve_or_create_entity(db, project_id, inferred_type, extracted_fact.subject, entity_name_map)
             if not subj_entity:
                 continue
 

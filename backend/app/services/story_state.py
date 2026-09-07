@@ -244,8 +244,11 @@ def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional
     location_states: List[LocationState] = []
     object_states: List[ObjectState] = []
 
+    NON_CHARACTER_KEYWORDS = ("storm", "rain", "wind", "weather", "outside", "inside the", "diner", "hospital", "station", "road", "street", "building", "camera", "time", "clock", "null")
+
     for ent in primary_entities:
-        if ent.type == "character":
+        ent_name_lower = ent.name.lower()
+        if ent.type == "character" and not any(kw in ent_name_lower for kw in NON_CHARACTER_KEYWORDS):
             residence_val = None
             for f in fact_states:
                 if f.subject.id == ent.id and f.predicate in ("lives_in", "residence", "home"):

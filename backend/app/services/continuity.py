@@ -1,7 +1,8 @@
 import logging
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from fastapi import HTTPException, status
 
 from app.db.models import Project, Scene, Entity, Fact, Event, Relationship, KnowledgeState, Issue, IssueReview
@@ -17,6 +18,39 @@ from app.schemas.issue_review import IssueReviewResponse
 logger = logging.getLogger("script_supervisor.continuity")
 
 MIN_CONFIDENCE_THRESHOLD = 0.70
+
+# Keywords that indicate an object is PRESENT / available
+_PRESENT_KEYWORDS = frozenset([
+    "has", "hold", "holds", "inside", "contain", "contains", "grabs", "grab",
+    "picks up", "pick up", "found", "finds", "acquires", "acquire", "returned",
+    "returns", "restored", "reappears", "reappear", "back", "retrieved", "retrieve",
+    "carries", "carry", "brought", "brings", "with him", "with her", "with them",
+    "in his bag", "in her bag", "in the bag",
+])
+
+# Keywords that indicate an object is ABSENT / unavailable
+_ABSENT_KEYWORDS = frozenset([
+    "missing", "gone", "lost", "disappeared", "disappear", "left behind",
+    "no longer", "without", "not have", "doesn't have", "does not have",
+    "forgot", "taken", "stolen", "destroyed", "dropped", "not found",
+    "can't find", "cannot find", "is gone", "was gone",
+])
+
+
+def _classify_object_state(text: str) -> Optional[str]:
+    """Returns 'PRESENT', 'ABSENT', or None based on keyword scan of text."""
+    t = text.lower()
+    absent_score = sum(1 for kw in _ABSENT_KEYWORDS if kw in t)
+    present_score = sum(1 for kw in _PRESENT_KEYWORDS if kw in t)
+    if absent_score > 0 and absent_score >= present_score:
+        return "ABSENT"
+    if present_score > 0:
+        return "PRESENT"
+    return None
+
+
+
+
 
 def generate_candidates_for_scene(
     db: Session, project_id: str, scene: Scene, prior_state: StoryStateResponse
@@ -115,17 +149,17 @@ def generate_candidates_for_scene(
                             reason=f"Character location changed from {prior_loc} to {loc_name} without travel event"
                         ))
 
-    # 3. Object Ownership Candidate Generation
+    # 3. Object Ownership & State Candidate Generation
     for rel in current_relationships:
-        if rel.relationship_type in ("owns", "possesses") and rel.target_entity:
+        if rel.relationship_type in ("owns", "possesses", "uses", "has") and rel.target_entity:
             obj_name = rel.target_entity.name
-            new_owner = rel.source_entity.name
+            user_name = rel.source_entity.name
             
             obj_prior = next((o for o in prior_state.objects if o.name.lower() == obj_name.lower()), None)
-            if obj_prior and obj_prior.current_owner:
-                prior_owner = obj_prior.current_owner.name
-                if prior_owner.lower() != new_owner.lower():
-                    transfer_event = any(ev.event_type.upper() in ("GIVE_OBJECT", "TAKE_OBJECT", "SELL_OBJECT") for ev in current_events)
+            if obj_prior:
+                # 3a. Possession change without transfer
+                if obj_prior.current_owner and obj_prior.current_owner.name.lower() != user_name.lower():
+                    transfer_event = any(ev.event_type.upper() in ("GIVE_OBJECT", "TAKE_OBJECT", "SELL_OBJECT", "RECOVER_OBJECT", "FIND_OBJECT") for ev in current_events)
                     if not transfer_event:
                         cand_id = f"cand_own_{rel.id}"
                         candidates.append(ContinuityCandidate(
@@ -134,20 +168,57 @@ def generate_candidates_for_scene(
                             entity_name=obj_name,
                             current_scene_id=scene.id,
                             current_scene_number=scene.scene_number,
-                            current_text=f"{new_owner} owns/possesses {obj_name}",
+                            current_text=f"{user_name} possesses/uses {obj_name}",
                             previous_scene_id=scene.id,
                             previous_scene_number=max(1, scene.scene_number - 1),
-                            previous_text=f"{prior_owner} previously owned {obj_name}",
-                            reason=f"Ownership of {obj_name} changed from {prior_owner} to {new_owner} without transfer"
+                            previous_text=f"{obj_prior.current_owner.name} previously held/owned {obj_name}",
+                            reason=f"Possession of {obj_name} changed from {obj_prior.current_owner.name} to {user_name} without an explicit transfer event"
                         ))
 
-    # 4. Knowledge Candidate Generation
+                # 3b. Object state / availability conflict (e.g. Insulin left behind -> used again)
+                obj_status = (obj_prior.attributes or {}).get("status") or getattr(obj_prior, "status", None)
+                if obj_status and str(obj_status).lower() in ("unavailable", "left_behind", "lost", "missing", "destroyed", "left"):
+                    recovery_event = any(ev.event_type.upper() in ("RECOVER_OBJECT", "FIND_OBJECT", "BUY_OBJECT", "RETRIEVE_OBJECT") for ev in current_events)
+                    if not recovery_event:
+                        cand_id = f"cand_objstate_{rel.id}"
+                        candidates.append(ContinuityCandidate(
+                            id=cand_id,
+                            issue_type="OBJECT_STATE_CONFLICT",
+                            entity_name=obj_name,
+                            current_scene_id=scene.id,
+                            current_scene_number=scene.scene_number,
+                            current_text=f"{user_name} uses/possesses {obj_name} in Scene {scene.scene_number}",
+                            previous_scene_id=scene.id,
+                            previous_scene_number=max(1, scene.scene_number - 1),
+                            previous_text=f"{obj_name} was previously established as unavailable/left behind (status: {obj_status})",
+                            reason=f"{obj_name} was left behind or unavailable in earlier scenes, but is used again without an intervening recovery event"
+                        ))
+
+    # 4. Event / Implied Interaction Candidate Generation (e.g. Diner visit)
+    for ev in current_events:
+        ev_desc = (ev.description or "").lower()
+        if any(w in ev_desc for w in ("visit", "diner", "meet", "again", "earlier", "remember", "back to")):
+            cand_id = f"cand_event_{ev.id}"
+            candidates.append(ContinuityCandidate(
+                id=cand_id,
+                issue_type="EVENT_CONFLICT",
+                entity_name=getattr(ev, "event_type", "Event Inconsistency"),
+                current_scene_id=scene.id,
+                current_scene_number=scene.scene_number,
+                current_text=f"Scene {scene.scene_number} event/dialogue implies prior visit or interaction: '{ev.event_type}: {ev.description}'",
+                previous_scene_id=scene.id,
+                previous_scene_number=max(1, scene.scene_number - 1),
+                previous_text="No matching prior event or visit established in preceding timeline.",
+                reason="Dialogue or interaction suggests a prior visit or relationship event not established in preceding scenes"
+            ))
+
+    # 5. Knowledge Candidate Generation
     for ck in current_knowledge:
-        char_name = ck.character_entity.name
+        char_name = ck.character_entity.name if ck.character_entity else "Character"
         knowledge_text = ck.knowledge.lower()
         
         char_prior = next((c for c in prior_state.characters if c.name.lower() == char_name.lower()), None)
-        prior_known_texts = [k.knowledge.lower() for k in char_prior.knowledge] if char_prior else []
+        prior_known_texts = [k.knowledge.lower() for k in char_prior.knowledge] if (char_prior and char_prior.knowledge) else []
         
         if not any(knowledge_text in pk or pk in knowledge_text for pk in prior_known_texts):
             cand_id = f"cand_k_{ck.id}"
@@ -164,7 +235,127 @@ def generate_candidates_for_scene(
                 reason=f"Character {char_name} acts on knowledge without prior transfer"
             ))
 
+    # 6. Cross-Scene Object State Candidate Generation
+    # Pre-filter: query DB for object entities in the current scene that had a
+    # prior ABSENT state. Package as ContinuityCandidate so Gemini can evaluate
+    # with full context — handling synonyms, negation, and edge cases properly.
+    curr_obj_entities = db.execute(text("""
+        SELECT DISTINCT e.name, e.id
+        FROM entities e
+        WHERE e.project_id = :pid AND e.type = 'object'
+    """), {"pid": project_id}).fetchall()
+
+    if curr_obj_entities:
+        # Build current scene text blob for object reference confirmation
+        curr_fact_blob_rows = db.execute(text("""
+            SELECT subject, predicate, value FROM facts WHERE scene_id = :sid
+        """), {"sid": scene.id}).fetchall()
+        curr_event_blob_rows = db.execute(text("""
+            SELECT description FROM events WHERE scene_id = :sid
+        """), {"sid": scene.id}).fetchall()
+        curr_blob = " ".join(
+            [f"{r.subject} {r.predicate} {r.value}" for r in curr_fact_blob_rows] +
+            [r.description or "" for r in curr_event_blob_rows]
+        ).lower()
+
+        for obj_row in curr_obj_entities:
+            obj_name = obj_row.name
+            obj_lower = obj_name.lower()
+
+            if len(obj_lower) < 4 or obj_lower not in curr_blob:
+                continue
+
+            # Query prior facts mentioning this object
+            p_facts = db.execute(text("""
+                SELECT f.subject, f.predicate, f.value, s.scene_number, s.id as scene_id
+                FROM facts f
+                JOIN scenes s ON f.scene_id = s.id
+                WHERE s.project_id = :pid
+                  AND s.scene_number < :csn
+                  AND (lower(f.subject) LIKE :pat OR lower(f.value) LIKE :pat OR lower(f.predicate) LIKE :pat)
+                ORDER BY s.scene_number ASC
+            """), {"pid": project_id, "csn": scene.scene_number, "pat": f"%{obj_lower}%"}).fetchall()
+
+            # Query prior events mentioning this object
+            p_events = db.execute(text("""
+                SELECT ev.description, ev.event_type, s.scene_number, s.id as scene_id
+                FROM events ev
+                JOIN scenes s ON ev.scene_id = s.id
+                WHERE s.project_id = :pid
+                  AND s.scene_number < :csn
+                  AND lower(ev.description) LIKE :pat
+                ORDER BY s.scene_number ASC
+            """), {"pid": project_id, "csn": scene.scene_number, "pat": f"%{obj_lower}%"}).fetchall()
+
+            if not p_facts and not p_events:
+                continue
+
+            # Build timeline of classified states
+            timeline: List[Tuple[int, str, str, str]] = []
+            for r in p_facts:
+                txt = f"{r.subject} {r.predicate} {r.value}"
+                st = _classify_object_state(txt)
+                if st:
+                    timeline.append((r.scene_number, r.scene_id, st, txt))
+            for r in p_events:
+                st = _classify_object_state(r.description or "")
+                if st:
+                    timeline.append((r.scene_number, r.scene_id, st, r.description or ""))
+
+            timeline.sort(key=lambda x: x[0])
+            if not timeline:
+                continue
+
+            # Walk timeline to find the last ABSENT → check if current scene is PRESENT
+            last_state, last_snum, last_sid, last_txt = None, None, None, ""
+            for (sn, sid, st, txt) in timeline:
+                last_state = st
+                last_snum = sn
+                last_sid = sid
+                last_txt = txt
+
+            if last_state != "ABSENT":
+                continue
+
+            # Build a rich evidence summary for Gemini to evaluate
+            # Include all state-bearing entries from the timeline so Gemini
+            # can reason about the full arc: present → absent → present
+            timeline_summary = "; ".join(
+                f"Sc.{sn}: [{st}] \"{txt[:80]}\"" for (sn, sid, st, txt) in timeline[-4:]
+            )
+
+            cand_id = f"cand_objstate_cross_{obj_row.id}"
+            candidates.append(ContinuityCandidate(
+                id=cand_id,
+                issue_type="OBJECT_STATE_CONFLICT",
+                entity_name=obj_name,
+                current_scene_id=scene.id,
+                current_scene_number=scene.scene_number,
+                current_text=(
+                    f"'{obj_name}' is referenced as present/used in Scene {scene.scene_number}."
+                ),
+                previous_scene_id=last_sid,
+                previous_scene_number=last_snum,
+                previous_text=(
+                    f"'{obj_name}' was last recorded as ABSENT in Scene {last_snum}: "
+                    f"\"{last_txt[:120]}\". "
+                    f"Full state arc: [{timeline_summary}]"
+                ),
+                reason=(
+                    f"'{obj_name}' was established as missing/absent in Scene {last_snum} "
+                    f"but reappears in Scene {scene.scene_number} without a recorded "
+                    f"recovery, transfer, or acquisition event."
+                )
+            ))
+            logger.info(
+                f"[CROSS-SCENE STATE] Scene #{scene.scene_number}: "
+                f"Nominated OBJECT_STATE_CONFLICT candidate for '{obj_name}' "
+                f"(last ABSENT in Sc.{last_snum}) — sending to Gemini for evaluation."
+            )
+
     return candidates
+
+
 
 
 def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[IssueResponse]:
@@ -213,9 +404,13 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
             filtered_candidates.append(cand)
 
     candidates = filtered_candidates
-    logger.info(f"Generated {len(candidates)} continuity candidates for scene #{scene.scene_number} (Strictness={strictness})")
+    cand_summary = {}
+    for c in candidates:
+        cand_summary[c.issue_type] = cand_summary.get(c.issue_type, 0) + 1
+    logger.info(f"[CONTINUITY] Scene #{scene.scene_number}: Generated {len(candidates)} candidates -> {cand_summary} (Strictness={strictness})")
 
     if not candidates:
+        logger.info(f"[CONTINUITY] Scene #{scene.scene_number}: 0 candidates generated. Returning empty issues list.")
         return []
 
     # 4. Stage 2: Gemini Evaluation using Hybrid Context
@@ -224,6 +419,7 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
     context_str = "\n".join(context_lines) if context_lines else f"Prior Scenes: 1 to {prior_scene_number}"
 
     gemini_eval_res = evaluate_continuity_candidates(candidates, scene.raw_text, context_str, continuity_strictness=strictness)
+    logger.info(f"[CONTINUITY] Scene #{scene.scene_number}: Gemini returned {len(gemini_eval_res.evaluations)} evaluations.")
 
     # Modulate confidence threshold based on strictness (0=0.85, 5=0.70, 10=0.55)
     effective_confidence_threshold = max(0.50, 0.85 - (strictness * 0.03))
@@ -233,7 +429,11 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
     cand_map = {c.id: c for c in candidates}
 
     for ev in gemini_eval_res.evaluations:
-        if ev.classification.upper() != "CONFLICT" or ev.confidence < effective_confidence_threshold:
+        eval_class = ev.classification.upper()
+        logger.info(f"[CONTINUITY EVAL] Scene #{scene.scene_number} Candidate '{ev.candidate_id}' -> Class: {eval_class}, Conf: {ev.confidence:.2f} (Threshold: {effective_confidence_threshold:.2f}), Title: '{ev.title}'")
+        
+        if eval_class not in ("CONFLICT", "AMBIGUOUS") or ev.confidence < (effective_confidence_threshold - 0.15):
+            logger.info(f"[CONTINUITY EVAL] Skipping candidate '{ev.candidate_id}' (Class={eval_class}, Conf={ev.confidence:.2f})")
             continue
 
         cand = cand_map.get(ev.candidate_id)
@@ -244,11 +444,15 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
         scene_nums = [cand.previous_scene_number, cand.current_scene_number]
         fingerprint = compute_issue_fingerprint(project_id, cand.issue_type, cand.entity_name, scene_nums)
 
+        # Map severity (AMBIGUOUS maps to WARNING or INFO)
+        computed_severity = ev.severity.upper() if eval_class == "CONFLICT" else "WARNING"
+
         # Check existing reviewed or open issues with same fingerprint
         existing_issue = db.query(Issue).filter(
             Issue.project_id == project_id,
             Issue.issue_fingerprint == fingerprint
         ).first()
+
 
         # Build evidence objects
         evidence_list = [
@@ -298,9 +502,10 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
             project_id=project_id,
             scene_id=scene.id,
             issue_type=cand.issue_type,
-            severity=ev.severity.upper(),
+            severity=computed_severity,
             title=ev.title,
             description=ev.description,
+
             confidence=ev.confidence,
             status="OPEN",
             evidence_json=[e.model_dump() for e in evidence_list],
@@ -330,9 +535,19 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
             created_at=issue_obj.created_at
         ))
 
-    db.commit()
-    logger.info(f"Persisted {len(persisted_issues)} continuity issues for scene #{scene.scene_number}")
+    try:
+        db.commit()
+    except Exception as commit_err:
+        logger.warning(f"Initial commit warning for scene #{scene.scene_number}: {commit_err}")
+        db.rollback()
+        try:
+            db.commit()
+        except Exception as retry_err:
+            logger.error(f"Commit retry failed for scene #{scene.scene_number}: {retry_err}")
+
+    logger.info(f"Persisted {len(persisted_issues)} continuity issues for scene #{scene.scene_number}.")
     return persisted_issues
+
 
 
 def get_project_issues(

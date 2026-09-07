@@ -219,6 +219,50 @@ def execute_targeted_reasoning(
                 pass
 
             if parsed_findings:
+                from app.services.issue_review import compute_issue_fingerprint
+                from app.schemas.issue import IssueEvidence
+
+                for f in parsed_findings:
+                    v = f.get("classification", "").upper()
+                    if v in ("CONFLICT", "AMBIGUOUS"):
+                        f_title = f.get("title") or "Story Reasoning Finding"
+                        f_desc = f.get("description") or f.get("reasoning_summary") or ""
+                        f_conf = float(f.get("confidence") or 0.85)
+                        f_sev = (f.get("severity") or "WARNING").upper()
+                        if v == "AMBIGUOUS" and f_sev == "ERROR":
+                            f_sev = "WARNING"
+                        
+                        f_type = "EVENT_CONFLICT" if any(w in f_title.lower() for w in ("visit", "diner", "event")) else ("OBJECT_STATE_CONFLICT" if any(w in f_title.lower() for w in ("object", "insulin", "item")) else "REASONING_CONFLICT")
+                        fingerprint = compute_issue_fingerprint(project_id, f_type, f_title[:50], [scene.scene_number])
+
+                        existing = db.query(Issue).filter(Issue.project_id == project_id, Issue.issue_fingerprint == fingerprint).first()
+                        if not existing:
+                            ev_json = [
+                                IssueEvidence(
+                                    scene_id=scene.id,
+                                    scene_number=scene.scene_number,
+                                    type="REASONING_EVIDENCE",
+                                    text=f_desc[:250]
+                                ).model_dump()
+                            ]
+                            issue_obj = Issue(
+                                project_id=project_id,
+                                scene_id=scene.id,
+                                issue_type=f_type,
+                                severity=f_sev,
+                                title=f_title,
+                                description=f_desc,
+                                confidence=f_conf,
+                                status="OPEN",
+                                evidence_json=ev_json,
+                                issue_fingerprint=fingerprint
+                            )
+                            db.add(issue_obj)
+                try:
+                    db.commit()
+                except Exception as commit_err:
+                    logger.warning(f"Notice on committing reasoning findings: {commit_err}")
+
                 f = parsed_findings[0]
                 verdict = f.get("classification") or ("CONFLICT" if "conflict" in cleaned.lower() else "NO_CONFLICT")
                 confidence = float(f.get("confidence") or 0.90)
@@ -251,6 +295,7 @@ def execute_targeted_reasoning(
                 evidence_items=retrieved_items,
                 writer_decision_context=next((i.content for i in retrieved_items if i.item_type == "WRITER_DECISION"), None)
             )
+
 
         raise ValueError("Empty response received from Gemini reasoning provider.")
 

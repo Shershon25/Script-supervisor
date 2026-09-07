@@ -1,20 +1,39 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ClaimResponse, ResearchTaskResponse, listClaims, triggerResearch, getResearchTask } from '@/lib/api';
-import { Globe, Search, ExternalLink, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Shield, RefreshCw, FileText } from 'lucide-react';
+import { ClaimResponse, ResearchTaskResponse, listClaims, listResearchTasks, triggerResearch, getResearchTask } from '@/lib/api';
+import { Globe, Search, ExternalLink, CheckCircle2, AlertTriangle, XCircle, HelpCircle, Shield, RefreshCw, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Props {
   projectId: string;
   onSelectSceneNumber?: (sceneNum: number) => void;
 }
 
+function cleanResearchText(text?: string): string {
+  if (!text) return '';
+  return text
+    .replace(/Source\s+[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\s*/gi, '')
+    .replace(/Source\s+ID\s*:\s*[a-f0-9-]{36}\s*/gi, '')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function ResearchPanel({ projectId, onSelectSceneNumber }: Props) {
+
   const [claims, setClaims] = useState<ClaimResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filterCategory, setFilterCategory] = useState<'ALL' | 'REAL_WORLD' | 'RESEARCH_NEEDED' | 'FICTIONAL'>('ALL');
   const [researchingClaimId, setResearchingClaimId] = useState<string | null>(null);
   const [expandedTask, setExpandedTask] = useState<Record<string, ResearchTaskResponse | null>>({});
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (claimId: string) => {
+    setExpandedSources(prev => ({ ...prev, [claimId]: !prev[claimId] }));
+  };
+
 
   useEffect(() => {
     fetchClaims();
@@ -23,10 +42,21 @@ export default function ResearchPanel({ projectId, onSelectSceneNumber }: Props)
   const fetchClaims = async () => {
     setLoading(true);
     try {
-      const data = await listClaims(projectId);
-      setClaims(data);
+      const [claimsData, tasksData] = await Promise.all([
+        listClaims(projectId),
+        listResearchTasks(projectId)
+      ]);
+      setClaims(claimsData);
+
+      const taskMap: Record<string, ResearchTaskResponse> = {};
+      tasksData.forEach((task) => {
+        if (task.claim_id) {
+          taskMap[task.claim_id] = task;
+        }
+      });
+      setExpandedTask(taskMap);
     } catch (e) {
-      console.error("Error fetching claims", e);
+      console.error("Error fetching claims and research tasks", e);
     } finally {
       setLoading(false);
     }
@@ -142,6 +172,12 @@ export default function ResearchPanel({ projectId, onSelectSceneNumber }: Props)
           const isContradicted = claim.status === 'CONTRADICTED';
           const isInconclusive = claim.status === 'INCONCLUSIVE';
           const taskData = expandedTask[claim.id];
+          const evaluation = taskData?.evaluation || claim.evaluation;
+          const sources = (taskData?.sources && taskData.sources.length > 0) ? taskData.sources : (claim.sources || []);
+
+          const primarySource = sources[0];
+          const additionalSources = sources.slice(1);
+          const isExpanded = !!expandedSources[claim.id];
 
           return (
             <div
@@ -224,67 +260,96 @@ export default function ResearchPanel({ projectId, onSelectSceneNumber }: Props)
                     <button
                       onClick={() => handleRunResearch(claim.id, true)}
                       disabled={researchingClaimId === claim.id}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 text-blue-300 font-semibold text-[11px] flex items-center space-x-1.5 transition-colors disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-lg bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 text-blue-300 font-semibold text-[10px] flex items-center space-x-1 transition-colors disabled:opacity-50"
                     >
-                      <Search className={`w-3.5 h-3.5 ${researchingClaimId === claim.id ? 'animate-spin' : ''}`} />
-                      <span>{researchingClaimId === claim.id ? 'Researching Parallel...' : 'Run Parallel Research'}</span>
+                      <Search className={`w-3 h-3 ${researchingClaimId === claim.id ? 'animate-spin' : ''}`} />
+                      <span>{researchingClaimId === claim.id ? 'Researching...' : 'Re-run Web Search'}</span>
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Evidence & Sources Details */}
-              {taskData && taskData.evaluation && (
+              {(evaluation || sources.length > 0) && (
                 <div className="mt-3 p-3 rounded-xl bg-background border border-border space-y-3">
                   <div className="flex items-center justify-between text-xs border-b border-border/60 pb-2">
                     <span className="font-bold text-accent-light uppercase text-[10px] tracking-wider">
                       Parallel Research Evidence & Evaluation:
                     </span>
-                    <span className="text-gray-400 font-mono text-[10px]">
-                      {Math.round(taskData.evaluation.confidence * 100)}% Confidence
-                    </span>
+                    {evaluation && (
+                      <span className="text-gray-400 font-mono text-[10px]">
+                        {Math.round(evaluation.confidence * 100)}% Confidence
+                      </span>
+                    )}
                   </div>
 
-                  <p className="text-xs text-gray-200 leading-relaxed font-medium">
-                    {taskData.evaluation.summary}
-                  </p>
-                  <p className="text-[11px] text-gray-400 italic">
-                    {taskData.evaluation.reasoning}
-                  </p>
+                  {evaluation && (
+                    <p className="text-xs text-gray-200 leading-relaxed font-medium">
+                      {cleanResearchText(evaluation.summary || evaluation.reasoning)}
+                    </p>
+                  )}
 
-                  {/* Sources List */}
-                  {taskData.sources && taskData.sources.length > 0 && (
-                    <div className="space-y-2 pt-2">
+                  {/* Primary Source Link & Collapsible Additional Sources */}
+                  {primarySource && (
+                    <div className="space-y-1.5 pt-2 border-t border-border/40">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                        Retrieved Web Sources ({taskData.sources.length}):
+                        Primary Source:
                       </span>
-                      {taskData.sources.map((src) => (
-                        <div key={src.id} className="p-2.5 rounded-lg bg-card/70 border border-border/60 space-y-1 text-xs">
-                          <div className="flex items-center justify-between">
-                            <a
-                              href={src.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-bold text-accent-light hover:underline flex items-center space-x-1 text-[11px]"
-                            >
-                              <span>{src.title}</span>
-                              <ExternalLink className="w-3 h-3 text-gray-400" />
-                            </a>
-                            <span className="text-[10px] font-mono text-gray-400 px-1.5 py-0.5 rounded bg-background">
-                              {src.domain}
+                      <a
+                        href={primarySource.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-bold text-blue-400 hover:text-blue-300 hover:underline flex items-center space-x-1.5 text-[11px] truncate bg-card/60 p-1.5 rounded-lg border border-border/50"
+                      >
+                        <span className="truncate">{cleanResearchText(primarySource.title) || primarySource.domain || 'Primary Source Link'}</span>
+                        <ExternalLink className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                        <span className="text-[9px] font-mono text-gray-400 px-1.5 py-0.5 rounded bg-background flex-shrink-0 border border-border/40 ml-auto">
+                          {primarySource.domain}
+                        </span>
+                      </a>
+
+                      {additionalSources.length > 0 && (
+                        <div className="pt-1">
+                          <button
+                            onClick={() => toggleExpanded(claim.id)}
+                            className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center space-x-1 transition-colors py-0.5"
+                          >
+                            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            <span>
+                              {isExpanded ? 'Hide' : 'Show'} {additionalSources.length} additional {additionalSources.length === 1 ? 'source' : 'sources'}
                             </span>
-                          </div>
-                          <p className="text-[11px] text-gray-300 font-mono leading-relaxed bg-background/50 p-1.5 rounded">
-                            "{src.excerpt}"
-                          </p>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-1.5 space-y-1.5 pl-1.5 border-l-2 border-blue-500/30">
+                              {additionalSources.map((src) => (
+                                <a
+                                  key={src.id || src.url}
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-semibold text-blue-400 hover:text-blue-300 hover:underline flex items-center space-x-1.5 text-[10px] truncate bg-card/40 p-1 rounded-md border border-border/40"
+                                >
+                                  <span className="truncate">{cleanResearchText(src.title) || src.domain || 'Source Link'}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                                  <span className="text-[9px] font-mono text-gray-400 px-1 py-0.2 rounded bg-background flex-shrink-0 border border-border/30 ml-auto">
+                                    {src.domain}
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
+
                 </div>
               )}
             </div>
           );
+
+
         })}
       </div>
     </div>

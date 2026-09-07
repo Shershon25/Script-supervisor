@@ -45,6 +45,7 @@ def process_scene_unified(db: Session, project_id: str, scene_id: str) -> Unifie
     entity_names: List[str] = []
 
     try:
+        logger.info(f"[UNIFIED PIPELINE] Starting analysis for Scene #{scene.scene_number} (ID={scene.id})")
         # Step 1: Parse scene semantics & update persistent story state
         proc_res = process_scene(db, project_id, scene.scene_number, scene.raw_text)
         analysis_data = proc_res.get("analysis", {})
@@ -56,9 +57,11 @@ def process_scene_unified(db: Session, project_id: str, scene_id: str) -> Unifie
         facts_count = len(facts)
         events_count = len(events)
         entity_names = [e.get("name") if isinstance(e, dict) else getattr(e, "name", str(e)) for e in entities if e]
+        logger.info(f"[UNIFIED PIPELINE] Step 1 complete for Scene #{scene.scene_number}: {entities_count} entities, {facts_count} facts, {events_count} events extracted.")
 
         # Step 2: Build historical Story State BEFORE current scene (up to scene_number - 1)
         prior_state = build_story_state(db, project_id, up_to_scene_number=max(0, scene.scene_number - 1))
+        logger.info(f"[UNIFIED PIPELINE] Step 2 complete for Scene #{scene.scene_number}: Built prior state with {len(prior_state.facts)} facts, {len(prior_state.events)} events.")
 
         # Step 3: Contextual Hybrid Retrieval for active entities
         hybrid_retrieval = hybrid_retrieve_context(
@@ -68,16 +71,19 @@ def process_scene_unified(db: Session, project_id: str, scene_id: str) -> Unifie
         # Step 4: Deterministic Continuity & Knowledge Checks
         issues = check_scene_continuity(db, project_id, scene.id)
         issues_created_count = len(issues)
+        logger.info(f"[UNIFIED PIPELINE] Step 4 complete for Scene #{scene.scene_number}: {issues_created_count} continuity issues created/returned.")
 
         # Step 5: Targeted AI Story Reasoning
         reasoning_res = execute_targeted_reasoning(
             db, project_id, scene.id, task_type="CONTINUITY", target_entity_names=entity_names
         )
+        logger.info(f"[UNIFIED PIPELINE] Step 5 complete for Scene #{scene.scene_number}: Story reasoning completed.")
 
         # Step 6: Real-World Claim Extraction & Gated Parallel Research Reuse
         try:
             claims = process_scene_claims(db, project_id, scene)
             claims_count = len(claims)
+            logger.info(f"[UNIFIED PIPELINE] Step 6 complete for Scene #{scene.scene_number}: {claims_count} claims processed.")
 
             for claim in claims:
                 if claim.requires_research:
