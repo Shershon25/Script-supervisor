@@ -78,6 +78,34 @@ export default function ScreenplayPage({
         isFirstNonEmpty = false;
       }
 
+      const upper = trimmed.toUpperCase();
+
+      // 0. Transition Detection (FADE IN:, FADE OUT., CUT TO:, etc.)
+      if (upper.startsWith('FADE IN')) {
+        isDialogueContext = false;
+        return (
+          <div key={idx} className="screenplay-action font-bold uppercase text-left my-3">
+            {line}
+          </div>
+        );
+      }
+
+      const isRightTransition = 
+        upper.startsWith('FADE OUT') || 
+        upper.endsWith('TO:') || 
+        upper.startsWith('CUT TO') || 
+        upper.startsWith('DISSOLVE TO') ||
+        upper.startsWith('FADE TO BLACK');
+
+      if (isRightTransition) {
+        isDialogueContext = false;
+        return (
+          <div key={idx} className="screenplay-transition font-bold uppercase text-right ml-auto my-3">
+            {line}
+          </div>
+        );
+      }
+
       // 1. Slugline / Scene Heading Detection
       const isSluglinePrefix = 
         trimmed.startsWith('INT.') || 
@@ -89,7 +117,7 @@ export default function ScreenplayPage({
 
       const hasTimeOfDaySuffix = /[\-\–\—]\s*(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DUSK|DAWN|CONTINUOUS|LATER|MOMENTS LATER|SAME)/i.test(trimmed);
 
-      if (isFirst || isSluglinePrefix || hasTimeOfDaySuffix) {
+      if (isSluglinePrefix || hasTimeOfDaySuffix) {
         isDialogueContext = false;
         return (
           <div key={idx} className="screenplay-slugline font-bold uppercase">

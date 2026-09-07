@@ -203,6 +203,16 @@ body {
   text-align: left;
 }
 
+.screenplay-transition {
+  margin-left: auto;
+  width: 100%;
+  text-align: right;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 /* Inline Highlights */
 .highlight-knowledge-gap {
   background-color: var(--highlight-amber);

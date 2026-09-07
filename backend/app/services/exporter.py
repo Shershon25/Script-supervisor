@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Tuple
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether
 from reportlab.pdfgen import canvas
 
@@ -23,7 +24,7 @@ SCENE_HEADING_PATTERN = re.compile(
     r'^(?:INT|EXT|EST|I/E|INT/EXT|INT\./EXT\.)[\.\s]', re.IGNORECASE
 )
 TRANSITION_PATTERN = re.compile(
-    r'^(?:FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:|MATCH CUT TO:|SMASH CUT TO:|FADE TO BLACK\.)|.*TO:$',
+    r'^(?:FADE IN:|FADE IN\.|FADE IN|FADE OUT\.|FADE OUT|CUT TO:|DISSOLVE TO:|MATCH CUT TO:|SMASH CUT TO:|FADE TO BLACK\.|FADE TO BLACK|INTERCUT WITH:).*$|.*TO:$',
     re.IGNORECASE
 )
 SCENE_TIME_PATTERN = re.compile(
@@ -258,15 +259,16 @@ def generate_pdf_export(
         spaceAfter=6
     )
 
-    # 6. Transition: Right side (4.0" from left margin)
+    # 6. Transition: Right-aligned bold transition (FADE OUT. / CUT TO:)
+    bold_font = f"{pdf_font}-Bold" if pdf_font in ("Courier", "Helvetica", "Times-Roman") else pdf_font
     style_transition = ParagraphStyle(
         'ScreenplayTransition',
-        fontName=pdf_font,
+        fontName=bold_font,
         fontSize=base_size,
         leading=leading,
-        leftIndent=4.0 * inch,
-        spaceBefore=10,
-        spaceAfter=10
+        alignment=TA_RIGHT,
+        spaceBefore=12,
+        spaceAfter=12
     )
 
     story = []
@@ -393,9 +395,14 @@ def generate_docx_export(
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(6)
         elif line_type == "TRANSITION":
-            p.paragraph_format.left_indent = Inches(4.0)
-            p.paragraph_format.space_before = Pt(10)
-            p.paragraph_format.space_after = Pt(10)
+            run.font.bold = True
+            upper_text = text.upper()
+            if "FADE IN" in upper_text:
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            else:
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.paragraph_format.space_before = Pt(12)
+            p.paragraph_format.space_after = Pt(12)
         else: # ACTION
             p.paragraph_format.space_before = Pt(4)
             p.paragraph_format.space_after = Pt(4)
@@ -463,29 +470,37 @@ def generate_fountain_export(scenes_text: List[str]) -> str:
 def parse_fountain_import(fountain_content: str) -> List[Dict[str, Any]]:
     """
     Parses an incoming .fountain or plain text script file into scene dict objects.
-    Splits scenes based on standard screenplay scene headings (INT, EXT, EST, etc.).
+    Splits scenes based on standard screenplay scene headings (INT, EXT, EST, etc.),
+    ignoring title page metadata preambles before the first scene heading.
     """
     lines = fountain_content.splitlines()
     scenes = []
     current_scene_lines = []
     scene_counter = 1
+    found_first_heading = False
 
     for line in lines:
         stripped = line.strip()
         if is_location_heading(stripped):
-            if current_scene_lines:
-                raw = "\n".join(current_scene_lines).strip()
-                if raw:
-                    scenes.append({
-                        "scene_number": scene_counter,
-                        "raw_text": raw
-                    })
-                    scene_counter += 1
-                current_scene_lines = []
+            if not found_first_heading:
+                found_first_heading = True
+                current_scene_lines = [line]
+                continue
+            else:
+                if current_scene_lines:
+                    raw = "\n".join(current_scene_lines).strip()
+                    if raw:
+                        scenes.append({
+                            "scene_number": scene_counter,
+                            "raw_text": raw
+                        })
+                        scene_counter += 1
+                    current_scene_lines = []
 
-        current_scene_lines.append(line)
+        if found_first_heading:
+            current_scene_lines.append(line)
 
-    if current_scene_lines:
+    if found_first_heading and current_scene_lines:
         raw = "\n".join(current_scene_lines).strip()
         if raw:
             scenes.append({
