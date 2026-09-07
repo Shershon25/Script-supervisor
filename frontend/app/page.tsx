@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Project, Scene, StoryStateResponse, IssueResponse,
-  listProjects, createProject, deleteProject, renameProject, listScenes, getStoryState, listIssues, seedDemoProject,
+  listProjects, createProject, deleteProject, renameProject, listScenes, getStoryState, listIssues,
   analyzeScene, analyzeUnifiedScene, reviewIssue, updateSceneText
 } from '@/lib/api';
 import HeaderNav from '@/components/Layout/HeaderNav';
@@ -347,20 +347,6 @@ function HomeContent() {
     }
   };
 
-  const handleLoadSampleProject = async () => {
-    setCreatingProject(true);
-    try {
-      const sampleProj = await seedDemoProject();
-      const list = await listProjects();
-      setProjects(list);
-      selectProject(sampleProj);
-    } catch (err: any) {
-      alert(err.message || 'Failed to load sample project');
-    } finally {
-      setCreatingProject(false);
-    }
-  };
-
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
@@ -424,7 +410,6 @@ function HomeContent() {
         onCreateProject={handleCreateProjectFromTitle}
         onRenameProject={handleRenameProject}
         onDeleteProject={handleDeleteProject}
-        onLoadDemoProject={handleLoadSampleProject}
         onImportSuccess={() => activeProject && loadProjectData(activeProject.id)}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -452,18 +437,9 @@ function HomeContent() {
             <div>
               <h2 className="text-xl font-bold text-txtPrimary">Script Supervisor Suite</h2>
               <p className="text-xs text-txtSecondary mt-1">
-                Open an existing screenplay project or load the official demo project ("The Last Signal").
+                Create a new screenplay project or select an existing one to get started.
               </p>
             </div>
-
-            <button
-              onClick={handleLoadSampleProject}
-              disabled={creatingProject}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50 text-xs"
-            >
-              <FolderPlus className="w-4 h-4" />
-              <span>Load Demo Project ("The Last Signal")</span>
-            </button>
 
             <form onSubmit={handleCreateInitialProject} className="space-y-3 text-left pt-2 border-t border-border">
               <input

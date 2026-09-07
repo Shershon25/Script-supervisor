@@ -4,8 +4,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project } from '@/lib/api';
 
-import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Trash2, Square, Pencil } from 'lucide-react';
+import { Sparkles, Sun, Moon, Check, PlayCircle, Loader2, ChevronDown, Search, X, Folder, Plus, FolderPlus, Upload, Download, Trash2, Square, Pencil } from 'lucide-react';
 import ImportScreenplayModal from '@/components/Import/ImportScreenplayModal';
+import ExportScreenplayModal from '@/components/Export/ExportScreenplayModal';
 
 interface Props {
   projects: Project[];
@@ -14,7 +15,6 @@ interface Props {
   onCreateProject: (title: string) => Promise<void>;
   onRenameProject?: (projectId: string, newTitle: string) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
-  onLoadDemoProject?: () => Promise<void>;
   onImportSuccess?: () => void;
   activeTab: 'editor' | 'outline' | 'characters' | 'reasoning' | 'timeline' | 'settings';
   onSelectTab: (tab: 'editor' | 'outline' | 'characters' | 'reasoning' | 'timeline' | 'settings') => void;
@@ -39,7 +39,6 @@ export default function HeaderNav({
   onCreateProject,
   onRenameProject,
   onDeleteProject,
-  onLoadDemoProject,
   onImportSuccess,
   activeTab,
   onSelectTab,
@@ -60,6 +59,7 @@ export default function HeaderNav({
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [projectToRename, setProjectToRename] = useState<Project | null>(null);
@@ -257,10 +257,23 @@ export default function HeaderNav({
                       setShowImportModal(true);
                       setDropdownOpen(false);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:bg-cardHover font-bold transition-colors text-xs"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
                   >
-                    <Upload className="w-3.5 h-3.5" />
+                    <Upload className="w-3.5 h-3.5 text-secondary" />
                     <span>Import Screenplay...</span>
+                  </button>
+                )}
+
+                {activeProject && (
+                  <button
+                    onClick={() => {
+                      setShowExportModal(true);
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-xs"
+                  >
+                    <Download className="w-3.5 h-3.5 text-secondary" />
+                    <span>Export Screenplay...</span>
                   </button>
                 )}
 
@@ -274,19 +287,6 @@ export default function HeaderNav({
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete Current Project...</span>
-                  </button>
-                )}
-
-                {onLoadDemoProject && (
-                  <button
-                    onClick={() => {
-                      onLoadDemoProject();
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-txtSecondary hover:text-txtPrimary hover:bg-cardHover font-medium transition-colors text-[11px]"
-                  >
-                    <FolderPlus className="w-3.5 h-3.5 text-secondary" />
-                    <span>Load Demo ("The Last Signal")</span>
                   </button>
                 )}
               </div>
@@ -409,6 +409,18 @@ export default function HeaderNav({
           </button>
         )}
 
+        {/* 1-Click Export Button */}
+        {activeProject && (
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-2.5 py-1.5 rounded-lg bg-cardHover border border-border hover:border-emerald-500 text-txtPrimary font-semibold flex items-center space-x-1.5 transition-all text-[11px]"
+            title="Export screenplay project as PDF, Word (.docx), or Fountain"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+        )}
+
         {/* Dark/Light Theme Switcher */}
         <button
           onClick={onToggleTheme}
@@ -417,11 +429,6 @@ export default function HeaderNav({
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-tertiary" /> : <Moon className="w-4 h-4 text-secondary" />}
         </button>
-
-        {/* User Profile Avatar */}
-        <div className="w-7 h-7 rounded-full bg-primary border border-border flex items-center justify-center text-white font-bold text-[10px]">
-          JS
-        </div>
       </div>
     </header>
 
@@ -494,6 +501,17 @@ export default function HeaderNav({
         onImportSuccess={() => {
           if (onImportSuccess) onImportSuccess();
         }}
+        theme={theme}
+      />
+    )}
+
+    {/* Export Screenplay Modal */}
+    {activeProject && (
+      <ExportScreenplayModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        projectId={activeProject.id}
+        projectName={activeProject.title}
         theme={theme}
       />
     )}

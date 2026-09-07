@@ -360,11 +360,6 @@ export async function resetDb(projectId?: string): Promise<{ status: string; mes
   return handleResponse<{ status: string; message: string }>(res);
 }
 
-export async function seedDemoProject(): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects/seed-demo`, { method: 'POST' });
-  return handleResponse<Project>(res);
-}
-
 export async function listProjects(): Promise<Project[]> {
   const res = await fetch(`${API_URL}/api/projects`);
   return handleResponse<Project[]>(res);
@@ -621,6 +616,7 @@ export interface ProjectSettings {
   project_id: string;
   reality_level: number;
   continuity_strictness: number;
+  auto_background_analysis_enabled?: boolean;
   settings_version: number;
   world_rules: StoryWorldRule[];
   created_at: string;
@@ -635,14 +631,16 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
 export async function updateProjectSettings(
   projectId: string,
   realityLevel?: number,
-  continuityStrictness?: number
+  continuityStrictness?: number,
+  autoBackgroundAnalysisEnabled?: boolean
 ): Promise<ProjectSettings> {
   const res = await fetch(`${API_URL}/api/projects/${projectId}/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       reality_level: realityLevel,
-      continuity_strictness: continuityStrictness
+      continuity_strictness: continuityStrictness,
+      auto_background_analysis_enabled: autoBackgroundAnalysisEnabled
     })
   });
   return handleResponse<ProjectSettings>(res);
@@ -761,6 +759,35 @@ export async function listImportedDocuments(
 ): Promise<ImportedDocument[]> {
   const res = await fetch(`${API_URL}/api/projects/${projectId}/documents`);
   return handleResponse<ImportedDocument[]>(res);
+}
+
+export function getExportUrl(
+  projectId: string,
+  format: 'pdf' | 'docx' | 'fountain' = 'pdf',
+  fontFamily: string = 'Courier',
+  fontSize: number = 12
+): string {
+  const params = new URLSearchParams({
+    format,
+    font_family: fontFamily,
+    font_size: fontSize.toString()
+  });
+  return `${API_URL}/api/projects/${projectId}/export?${params.toString()}`;
+}
+
+export function downloadProjectScript(
+  projectId: string,
+  format: 'pdf' | 'docx' | 'fountain' = 'pdf',
+  fontFamily: string = 'Courier',
+  fontSize: number = 12
+) {
+  const url = getExportUrl(projectId, format, fontFamily, fontSize);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', '');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 
