@@ -1,12 +1,12 @@
 import logging
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect, text
 
 from app.config import settings
 from app.db.database import engine, Base
-from app.api import health, projects, scenes, story_state, issues, claims, research, retrieval, reasoning, unified, timeline, settings as settings_api, documents
+from app.api import health, projects, scenes, story_state, issues, claims, research, retrieval, reasoning, unified, timeline, settings as settings_api, documents, export_api
 
 # Configure logging
 logging.basicConfig(
@@ -90,6 +90,7 @@ app.include_router(unified.router)
 app.include_router(timeline.router)
 app.include_router(settings_api.router)
 app.include_router(documents.router)
+app.include_router(export_api.router)
 
 
 @app.get("/")
