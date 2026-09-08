@@ -144,13 +144,8 @@ function HomeContent() {
   async function loadProjectData(projectId: string) {
     setLoadingData(true);
     try {
-      const [scenesList, currentStoryState, projectIssues] = await Promise.all([
-        listScenes(projectId),
-        getStoryState(projectId),
-        listIssues(projectId)
-      ]);
-
-      // Check localStorage for un-flushed drafts
+      // 1. Fetch scenes first and immediately render editor (0ms blocking)
+      const scenesList = await listScenes(projectId);
       const scenesWithDrafts = scenesList.map((sc) => {
         try {
           const cached = localStorage.getItem(`script_draft_${projectId}_${sc.id}`);
@@ -162,10 +157,7 @@ function HomeContent() {
       });
 
       setScenes(scenesWithDrafts);
-      setStoryState(currentStoryState);
-      setIssues(projectIssues);
       
-      // Initialize analyzedTextMap ONLY for scenes that have completed analysis
       setAnalyzedTextMap((prev) => {
         const updated = { ...prev };
         scenesList.forEach((s) => {
@@ -179,6 +171,15 @@ function HomeContent() {
       if (scenesList.length > 0 && !activeSceneNumber) {
         setActiveSceneNumber(scenesList[0].scene_number);
       }
+
+      // 2. Fetch story state and issues concurrently without blocking scene editor rendering
+      const [currentStoryState, projectIssues] = await Promise.all([
+        getStoryState(projectId),
+        listIssues(projectId)
+      ]);
+
+      setStoryState(currentStoryState);
+      setIssues(projectIssues);
     } catch (e) {
       console.error("Error loading project data", e);
     } finally {
