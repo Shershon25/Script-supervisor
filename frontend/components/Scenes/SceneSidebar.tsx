@@ -36,8 +36,15 @@ export default function SceneSidebar({
   });
 
   const getSlugline = (text: string) => {
-    const firstLine = text.trim().split('\n')[0];
-    return firstLine.substring(0, 22).toUpperCase();
+    const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    // Find the first line containing INT. or EXT. or INT/EXT.
+    const headingLine = lines.find(l => /^(?:INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(l));
+    if (headingLine) {
+      return headingLine.substring(0, 26).toUpperCase();
+    }
+    // Fall back to first non-transition line (e.g. skip FADE IN:)
+    const contentLine = lines.find(l => !/^(?:FADE IN:|FADE OUT|CUT TO:)/i.test(l)) || lines[0] || '';
+    return contentLine.substring(0, 26).toUpperCase();
   };
 
   if (collapsed) {

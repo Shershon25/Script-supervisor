@@ -251,7 +251,12 @@ export default function SupervisorPanel({
           <CanonMemoryView storyState={storyState} onSelectSceneNumber={onSelectSceneNumber} />
         ) : (
           <div className="flex-1 overflow-y-auto min-h-0 pr-1">
-            <ResearchView projectId={projectId} onSelectSceneNumber={onSelectSceneNumber} />
+            <ResearchView
+              projectId={projectId}
+              activeSceneNumber={activeSceneNumber}
+              scopeFilter={scopeFilter}
+              onSelectSceneNumber={onSelectSceneNumber}
+            />
           </div>
         )}
       </div>

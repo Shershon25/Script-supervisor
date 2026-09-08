@@ -120,8 +120,10 @@ function HomeContent() {
     try {
       const list = await listProjects();
       setProjects(list);
-      if (list.length > 0 && !activeProject) {
-        selectProject(list[0]);
+      if (list.length > 0) {
+        const savedProjectId = typeof window !== 'undefined' ? localStorage.getItem('active_project_id') : null;
+        const targetProject = list.find(p => p.id === savedProjectId) || list[0];
+        selectProject(targetProject);
       }
     } catch (e) {
       console.error("Error fetching projects", e);
@@ -133,6 +135,9 @@ function HomeContent() {
       await flushPendingSave(activeProject.id, currentScene.id, currentScene.raw_text);
     }
     setActiveProject(proj);
+    try {
+      localStorage.setItem('active_project_id', proj.id);
+    } catch (e) {}
     loadProjectData(proj.id);
   }
 
@@ -398,6 +403,9 @@ function HomeContent() {
           selectProject(updatedList[0]);
         } else {
           setActiveProject(null);
+          try {
+            localStorage.removeItem('active_project_id');
+          } catch (e) {}
           setScenes([]);
           setStoryState(null);
           setIssues([]);

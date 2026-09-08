@@ -18,10 +18,17 @@ function cleanResearchText(text?: string): string {
 
 interface ResearchViewProps {
   projectId: string;
+  activeSceneNumber?: number;
+  scopeFilter?: 'project' | 'scene';
   onSelectSceneNumber?: (sceneNum: number) => void;
 }
 
-export default function ResearchView({ projectId, onSelectSceneNumber }: ResearchViewProps) {
+export default function ResearchView({
+  projectId,
+  activeSceneNumber,
+  scopeFilter = 'project',
+  onSelectSceneNumber
+}: ResearchViewProps) {
 
   const [claims, setClaims] = useState<ClaimResponse[]>([]);
   const [tasksMap, setTasksMap] = useState<Record<string, ResearchTaskResponse>>({});
@@ -81,6 +88,11 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Researc
     setExpandedSources(prev => ({ ...prev, [claimId]: !prev[claimId] }));
   };
 
+  // Filter claims based on scope (Entire Script vs Active Scene)
+  const scopedClaims = (scopeFilter === 'scene' && activeSceneNumber)
+    ? claims.filter(c => c.scene_number === activeSceneNumber)
+    : claims;
+
   if (loading) {
     return (
       <div className="p-6 text-center text-txtSecondary font-mono text-xs">
@@ -90,13 +102,17 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Researc
     );
   }
 
-  if (claims.length === 0) {
+  if (scopedClaims.length === 0) {
     return (
       <div className="p-6 text-center text-txtSecondary space-y-2">
         <Globe className="w-6 h-6 mx-auto text-blue-400 mb-1" />
-        <h4 className="text-xs font-bold text-txtPrimary">No External Research Needed</h4>
+        <h4 className="text-xs font-bold text-txtPrimary">
+          {scopeFilter === 'scene' ? `No External Research in Sc. #${activeSceneNumber}` : 'No External Research Needed'}
+        </h4>
         <p className="text-[11px] text-txtMuted leading-relaxed">
-          This scene contains internal story facts. No real-world procedural, historical, or geographic claims require external web verification.
+          {scopeFilter === 'scene' 
+            ? `Scene #${activeSceneNumber} contains no real-world procedural, historical, or geographic claims requiring research.` 
+            : 'This scene contains internal story facts. No real-world procedural, historical, or geographic claims require external web verification.'}
         </p>
       </div>
     );
@@ -104,7 +120,7 @@ export default function ResearchView({ projectId, onSelectSceneNumber }: Researc
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0 space-y-3 text-xs pr-1">
-      {claims.map((claim) => {
+      {scopedClaims.map((claim) => {
         const task = tasksMap[claim.id];
         const evaluation = task?.evaluation || claim.evaluation;
         const sources = (task?.sources && task.sources.length > 0) ? task.sources : (claim.sources || []);

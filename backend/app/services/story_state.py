@@ -11,19 +11,12 @@ from app.schemas.story_state import (
 
 logger = logging.getLogger("script_supervisor.story_state")
 
-INVALID_CHARACTER_SUBSTRINGS = (
-    "travel", "teleportation", "audience", "scene", "camera", "narrator", 
-    "null", "none", "unknown", "action", "discrepancy", "investigation",
-    "secret code", "sound", "shutter"
-)
-
 def is_valid_character_name(name: str) -> bool:
+    """Validates basic non-empty string sanity for character names."""
     if not name or not name.strip():
         return False
     lower = name.strip().lower()
     if lower in ("null", "none", "unknown", "audience", "camera", "scene", "narrator"):
-        return False
-    if any(term in lower for term in INVALID_CHARACTER_SUBSTRINGS):
         return False
     return True
 
@@ -74,7 +67,7 @@ def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional
 
     entities = valid_entities
 
-    # 2. Build Helper Entity References & Resolve Name Aliases (e.g. "Arjun" -> "ARJUN RAO")
+    # 2. Build Helper Entity References & Resolve Name Aliases (e.g. "Arjun" -> "ARJUN RAO", "Nora Vale" -> "Nora Chen")
     canonical_entity_map: Dict[str, Entity] = {}
     primary_entities: List[Entity] = []
 
@@ -87,19 +80,26 @@ def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional
 
     for ent in sorted_entities:
         ent_lower = ent.name.strip().lower()
-        ent_tokens = set(ent_lower.split())
+        ent_tokens = [w for w in ent_lower.split() if len(w) > 2]
         matched = None
         for primary in primary_entities:
             if primary.type.lower() == ent.type.lower():
                 primary_lower = primary.name.strip().lower()
-                primary_tokens = set(primary_lower.split())
+                primary_tokens = [w for w in primary_lower.split() if len(w) > 2]
                 
                 # 1. Direct subset token match (e.g. "Arjun" -> "ARJUN RAO")
-                if ent_tokens and ent_tokens.issubset(primary_tokens):
+                if set(ent_tokens) and set(ent_tokens).issubset(set(primary_tokens)):
                     matched = primary
                     break
                 
-                # 2. Possessive descriptor title matching (e.g. "Arjun's Father" -> "Rajesh Rao")
+                # 2. Shared first-name resolution for characters (e.g. "Nora Vale" -> "Nora Chen")
+                if primary.type.lower() == "character" and ent_tokens and primary_tokens:
+                    # If first names match (e.g. "nora") and no third distinct person exists
+                    if ent_tokens[0] == primary_tokens[0] and ent_tokens[0] not in ("dr.", "mr.", "mrs.", "ms.", "prof."):
+                        matched = primary
+                        break
+
+                # 3. Possessive descriptor title matching (e.g. "Arjun's Father" -> "Rajesh Rao")
                 if ("father" in ent_lower or "parent" in ent_lower or "mother" in ent_lower) and primary.type.lower() == "character":
                     if "father" not in primary_lower and "parent" not in primary_lower and "mother" not in primary_lower:
                         matched = primary
