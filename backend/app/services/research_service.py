@@ -107,7 +107,8 @@ Compare:
 → STORY_FACT or FICTIONAL_WORLD_RULE
 → No research unless the scene explicitly presents the travel time as a real-world assertion rather than a fictional mechanism.
 
-Research ONLY claims involving externally verifiable reality, such as:
+- DO NOT classify assertions about real-world scientific state or feasibility (e.g. ❌ "Stable temporal fields are not scientifically established", ❌ "No material known today is superconducting") as FICTIONAL_WORLD_RULE. Those are REAL_WORLD_CLAIM.
+- Research ONLY claims involving externally verifiable reality, such as:
 - geography and travel times/distances
 - historical dates and events
 - real-world institutions or locations
@@ -548,7 +549,7 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
         elif ext.claim_type == "FICTIONAL_WORLD_RULE":
             from app.db.models import Issue
             from app.services.issue_review import compute_issue_fingerprint
-            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", ext.claim_text[:50], [scene.scene_number])
+            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", f"scene_{scene.scene_number}_world_rule", [scene.scene_number])
             existing_issue = db.query(Issue).filter(
                 Issue.project_id == project_id,
                 Issue.issue_fingerprint == rule_fingerprint
@@ -572,7 +573,7 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
                     issue_fingerprint=rule_fingerprint
                 )
                 db.add(issue_obj)
-                logger.info(f"Created WORLD_RULE_CANDIDATE issue for claim '{ext.claim_text[:50]}'")
+                logger.info(f"Created WORLD_RULE_CANDIDATE issue for scene #{scene.scene_number}")
 
         # Apply Reality Level constraints (0 = Pure Fantasy, 10 = Strict Documentary)
         if reality_lvl == 0:

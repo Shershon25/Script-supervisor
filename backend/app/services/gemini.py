@@ -256,7 +256,10 @@ Assign Confidence:
 - Object Location: Was there an event that could have moved, transferred, hidden, or changed the object?
 - Ownership: Did ownership actually change, or is the current scene only showing physical possession/use?
 - Relationships: Is this genuinely incompatible with the earlier relationship, or could the relationship have evolved?
-- Knowledge: Is there a supported path by which the character could have learned this?
+- Knowledge: Evaluate unestablished character knowledge based on CONTINUITY STRICTNESS LEVEL:
+  - Low Strictness (0-3): Assume off-screen learning if plausible; classify as NO_CONFLICT unless explicitly impossible.
+  - Medium Strictness (4-7): Classify as AMBIGUOUS (WARNING) when a character claims or acts on specific knowledge (e.g. "You said it was destroyed in the fire") without a supporting prior acquisition event.
+  - High Strictness (8-10): Ultra-strict enforcement; classify as KNOWLEDGE_CONFLICT (ERROR/WARNING) whenever knowledge is claimed or used without explicit prior setup in preceding scenes.
 - Events / Timeline: Are the events actually mutually incompatible at the relevant story time? (Screenplay order does not always equal story time).
 
 ---
