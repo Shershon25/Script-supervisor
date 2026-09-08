@@ -452,6 +452,7 @@ export async function deleteProject(id: string): Promise<{ status: string; messa
   return handleResponse<{ status: string; message: string }>(res);
 }
 
+
 export async function renameProject(id: string, title: string): Promise<Project> {
   const res = await authFetch(`${API_URL}/api/projects/${id}`, {
     method: 'PUT',
@@ -494,9 +495,13 @@ export async function analyzeScene(
 
 export async function analyzeUnifiedScene(
   projectId: string,
-  sceneId: string
+  sceneId: string,
+  clearProjectEntities: boolean = false
 ): Promise<UnifiedAnalysisResponse> {
-  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analyze`, {
+  const url = clearProjectEntities
+    ? `${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analyze?clear_project_entities=true`
+    : `${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analyze`;
+  const res = await authFetch(url, {
     method: 'POST'
   });
   return handleResponse<UnifiedAnalysisResponse>(res);

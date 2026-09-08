@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/projects", tags=["unified"])
 def analyze_scene_unified_endpoint(
     project_id: str,
     scene_id: str,
+    clear_project_entities: bool = False,
     db: Session = Depends(get_db)
 ):
     """
@@ -19,11 +20,12 @@ def analyze_scene_unified_endpoint(
     AI story reasoning, gated external research, and issue deduplication.
     """
     try:
-        return process_scene_unified(db, project_id, scene_id)
+        return process_scene_unified(db, project_id, scene_id, clear_project_entities=clear_project_entities)
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unified analysis failed: {str(e)}")
+
 
 @router.get("/{project_id}/scenes/{scene_id}/analysis")
 def get_scene_analysis_run_endpoint(

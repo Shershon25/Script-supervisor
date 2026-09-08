@@ -219,7 +219,7 @@ def confirm_document_import(
     try:
         # If replace mode: delete existing scenes & clear stale analysis
         if payload.mode == "replace":
-            from app.db.models import Fact, Event, Relationship, KnowledgeState, Issue, IssueReview, Claim, ResearchTask, PlotEvent
+            from app.db.models import Fact, Event, Relationship, KnowledgeState, Issue, IssueReview, Claim, ResearchTask, PlotEvent, Entity
             db.query(IssueReview).filter(IssueReview.project_id == project_id).delete(synchronize_session=False)
             db.query(Issue).filter(Issue.project_id == project_id).delete(synchronize_session=False)
             db.query(ResearchTask).filter(ResearchTask.project_id == project_id).delete(synchronize_session=False)
@@ -230,6 +230,7 @@ def confirm_document_import(
             db.query(KnowledgeState).filter(KnowledgeState.project_id == project_id).delete(synchronize_session=False)
             db.query(PlotEvent).filter(PlotEvent.project_id == project_id).delete(synchronize_session=False)
             db.query(SceneAnalysisRun).filter(SceneAnalysisRun.project_id == project_id).delete(synchronize_session=False)
+            db.query(Entity).filter(Entity.project_id == project_id).delete(synchronize_session=False)
 
             existing_scenes = db.query(Scene).filter(Scene.project_id == project_id).all()
             for s in existing_scenes:

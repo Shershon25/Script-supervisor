@@ -20,6 +20,44 @@ def is_valid_character_name(name: str) -> bool:
         return False
     return True
 
+def purge_invalid_and_orphaned_entities(db: Session, project_id: str):
+    """
+    Purges invalid non-character entity names (e.g. null, unknown) and
+    orphaned entities that have no remaining facts, events, relationships, or knowledge states.
+    """
+    entities = db.query(Entity).filter(Entity.project_id == project_id).all()
+    for ent in entities:
+        is_invalid = ent.type.lower() == "character" and not is_valid_character_name(ent.name)
+        
+        # Check if entity is orphaned (has 0 connected records)
+        has_facts = db.query(Fact).filter(Fact.subject_entity_id == ent.id).first() is not None
+        has_events = db.query(Event).filter(
+            (Event.actor_entity_id == ent.id) | 
+            (Event.target_entity_id == ent.id) | 
+            (Event.location_entity_id == ent.id)
+        ).first() is not None
+        has_relationships = db.query(Relationship).filter(
+            (Relationship.source_entity_id == ent.id) | 
+            (Relationship.target_entity_id == ent.id)
+        ).first() is not None
+        has_knowledge = db.query(KnowledgeState).filter(KnowledgeState.character_entity_id == ent.id).first() is not None
+
+        if is_invalid or not (has_facts or has_events or has_relationships or has_knowledge):
+            logger.info(f"Purging invalid/orphaned entity '{ent.name}' ({ent.id}) from DB")
+            try:
+                db.query(Fact).filter(Fact.subject_entity_id == ent.id).delete()
+                db.query(Event).filter(Event.actor_entity_id == ent.id).update({"actor_entity_id": None})
+                db.query(Event).filter(Event.target_entity_id == ent.id).update({"target_entity_id": None})
+                db.query(Event).filter(Event.location_entity_id == ent.id).update({"location_entity_id": None})
+                db.query(Relationship).filter(Relationship.source_entity_id == ent.id).delete()
+                db.query(Relationship).filter(Relationship.target_entity_id == ent.id).delete()
+                db.query(KnowledgeState).filter(KnowledgeState.character_entity_id == ent.id).delete()
+                db.query(Entity).filter(Entity.id == ent.id).delete()
+                db.flush()
+            except Exception as ex:
+                logger.warning(f"Error purging entity '{ent.name}': {ex}")
+
+
 def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional[int] = None) -> StoryStateResponse:
     """
     Core Story State Service:
@@ -36,6 +74,9 @@ def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional
             detail=f"Project '{project_id}' not found."
         )
 
+    # Automatically clean invalid and orphaned entity records prior to building story state
+    purge_invalid_and_orphaned_entities(db, project_id)
+
     # 1. Fetch raw DB records up to scene_number
     scenes_query = db.query(Scene).filter(Scene.project_id == project_id)
     if up_to_scene_number is not None:
@@ -46,26 +87,6 @@ def build_story_state(db: Session, project_id: str, up_to_scene_number: Optional
     scene_map: Dict[str, Scene] = {s.id: s for s in scenes}
 
     entities = db.query(Entity).filter(Entity.project_id == project_id).order_by(Entity.name).all()
-
-    # Purge invalid non-character entity rows from DB
-    valid_entities = []
-    for ent in entities:
-        if ent.type.lower() == "character" and not is_valid_character_name(ent.name):
-            logger.info(f"Purging invalid non-character entity '{ent.name}' ({ent.id}) from DB")
-            try:
-                db.query(Fact).filter(Fact.subject_entity_id == ent.id).delete()
-                db.query(Event).filter(Event.actor_entity_id == ent.id).update({"actor_entity_id": None})
-                db.query(Relationship).filter(Relationship.source_entity_id == ent.id).delete()
-                db.query(Relationship).filter(Relationship.target_entity_id == ent.id).delete()
-                db.query(KnowledgeState).filter(KnowledgeState.character_entity_id == ent.id).delete()
-                db.query(Entity).filter(Entity.id == ent.id).delete()
-                db.flush()
-            except Exception as ex:
-                logger.warning(f"Error purging invalid entity '{ent.name}': {ex}")
-        else:
-            valid_entities.append(ent)
-
-    entities = valid_entities
 
     # 2. Build Helper Entity References & Resolve Name Aliases (e.g. "Arjun" -> "ARJUN RAO", "Nora Vale" -> "Nora Chen")
     canonical_entity_map: Dict[str, Entity] = {}

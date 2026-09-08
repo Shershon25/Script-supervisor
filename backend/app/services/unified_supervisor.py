@@ -13,15 +13,31 @@ from app.schemas.unified import UnifiedAnalysisResponse, AnalysisRunSummary
 
 logger = logging.getLogger("script_supervisor.unified_supervisor")
 
-def process_scene_unified(db: Session, project_id: str, scene_id: str) -> UnifiedAnalysisResponse:
+def process_scene_unified(db: Session, project_id: str, scene_id: str, clear_project_entities: bool = False) -> UnifiedAnalysisResponse:
     """
     Application Service: Unified Script Supervisor Scene Ingestion & Analysis Pipeline.
     Orchestrates parsing, historical state boundary checking, hybrid retrieval, deterministic checks,
     AI story reasoning, gated external research, and issue deduplication.
+    If clear_project_entities=True, wipes all existing project entities, facts, events, and issues for a clean slate.
     """
     scene = db.query(Scene).filter(Scene.id == scene_id, Scene.project_id == project_id).first()
     if not scene:
         raise ValueError(f"Scene '{scene_id}' not found in project '{project_id}'")
+
+    if clear_project_entities:
+        logger.info(f"[UNIFIED PIPELINE] Purging all existing entities and stale analysis data for project '{project_id}' prior to full project analysis...")
+        from app.db.models import Fact, Event, Relationship, KnowledgeState, Issue, IssueReview, Claim, ResearchTask, PlotEvent, Entity
+        db.query(IssueReview).filter(IssueReview.project_id == project_id).delete(synchronize_session=False)
+        db.query(Issue).filter(Issue.project_id == project_id).delete(synchronize_session=False)
+        db.query(ResearchTask).filter(ResearchTask.project_id == project_id).delete(synchronize_session=False)
+        db.query(Claim).filter(Claim.project_id == project_id).delete(synchronize_session=False)
+        db.query(Fact).filter(Fact.project_id == project_id).delete(synchronize_session=False)
+        db.query(Event).filter(Event.scene_id.in_(db.query(Scene.id).filter(Scene.project_id == project_id))).delete(synchronize_session=False)
+        db.query(Relationship).filter(Relationship.project_id == project_id).delete(synchronize_session=False)
+        db.query(KnowledgeState).filter(KnowledgeState.project_id == project_id).delete(synchronize_session=False)
+        db.query(PlotEvent).filter(PlotEvent.project_id == project_id).delete(synchronize_session=False)
+        db.query(Entity).filter(Entity.project_id == project_id).delete(synchronize_session=False)
+        db.commit()
 
     started_at = datetime.now(timezone.utc)
     

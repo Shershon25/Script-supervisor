@@ -293,7 +293,8 @@ function HomeContent() {
         });
 
         await updateSceneText(activeProject.id, sc.id, sc.raw_text);
-        await analyzeUnifiedScene(activeProject.id, sc.id);
+        const isFirstSceneInBatch = (i === 0);
+        await analyzeUnifiedScene(activeProject.id, sc.id, isFirstSceneInBatch);
         setAnalyzedTextMap(prev => ({ ...prev, [sc.id]: sc.raw_text }));
         completedCount++;
 
