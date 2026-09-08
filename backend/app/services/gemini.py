@@ -73,6 +73,7 @@ STRICT RULES FOR KNOWLEDGE EXTRACTION:
 - DO NOT EXTRACT internal emotional reactions or confusion (e.g. ❌ "Maya becomes confused after Vikram's statement", ❌ "Arjun looks surprised").
 - DO NOT EXTRACT transient environmental sound effects or physical scene states (e.g. ❌ "A camera shutter sound is heard", ❌ "The old photograph is burning"). Those belong in Events.
 - DO NOT EXTRACT duplicate or paraphrased variations of the same learned fact. Synthesize into a single clean canonical assertion (e.g. "Maya learned Vikram burned the photograph").
+- EXTRACT DIALOGUE KNOWLEDGE ASSERTIONS: Always extract a Character Knowledge Change when a character asserts, claims, or references a prior statement, event, or fact in dialogue (e.g. Nora saying "You said it was destroyed in the fire" -> Extract character="Nora Chen", knowledge="Learned or claims Elias stated the watch was destroyed in the fire").
 - EXTRACT ONLY discrete, actionable story facts that establish what a character knows or believes (e.g. "Maya learned Pier 19 was sealed in 1985", "Maya was told by Vikram that Arjun never had the photograph").
 
 ### F. External Claims

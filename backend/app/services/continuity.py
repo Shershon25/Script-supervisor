@@ -216,10 +216,10 @@ def generate_candidates_for_scene(
     for ck in current_knowledge:
         char_name = ck.character_entity.name if ck.character_entity else "Character"
         knowledge_text = ck.knowledge.lower()
-        
+
         char_prior = next((c for c in prior_state.characters if c.name.lower() == char_name.lower()), None)
         prior_known_texts = [k.knowledge.lower() for k in char_prior.knowledge] if (char_prior and char_prior.knowledge) else []
-        
+
         if not any(knowledge_text in pk or pk in knowledge_text for pk in prior_known_texts):
             cand_id = f"cand_k_{ck.id}"
             candidates.append(ContinuityCandidate(

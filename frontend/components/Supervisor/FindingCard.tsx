@@ -83,12 +83,18 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
     }
   };
 
+  const isEvent = issue.issue_type.includes('EVENT');
+
   // Theme-aware color styles per finding category
   const cardBorderClass = isResolved
     ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-500/10 dark:border-emerald-500/40'
-    : isLocation
+    : isTimeline || isLocation
     ? 'bg-rose-500/5 border-rose-500/30 dark:bg-rose-500/10 dark:border-rose-500/40 shadow-md'
-    : isKnowledge || isObject
+    : isWorldRule
+    ? 'bg-teal-500/5 border-teal-500/30 dark:bg-teal-500/10 dark:border-teal-500/40 shadow-md'
+    : isKnowledge
+    ? 'bg-blue-500/5 border-blue-500/30 dark:bg-blue-500/10 dark:border-blue-500/40 shadow-md'
+    : isEvent || isObject
     ? 'bg-amber-500/5 border-amber-500/30 dark:bg-amber-500/10 dark:border-amber-500/40 shadow-md'
     : isReasoning
     ? 'bg-purple-500/5 border-purple-500/30 dark:bg-purple-500/10 dark:border-purple-500/40 shadow-md'
@@ -96,17 +102,25 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
 
   const badgeClass = isResolved
     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:bg-emerald-500/25 dark:border-emerald-500/50 dark:text-emerald-400 font-bold'
-    : isLocation
+    : isTimeline || isLocation
     ? 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:bg-rose-500/25 dark:border-rose-500/50 dark:text-rose-400 font-bold'
-    : isKnowledge || isObject
+    : isWorldRule
+    ? 'bg-teal-500/15 border-teal-500/40 text-teal-700 dark:bg-teal-500/25 dark:border-teal-500/50 dark:text-teal-400 font-bold'
+    : isKnowledge
+    ? 'bg-blue-500/15 border-blue-500/40 text-blue-700 dark:bg-blue-500/25 dark:border-blue-500/50 dark:text-blue-400 font-bold'
+    : isEvent || isObject
     ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:bg-amber-500/25 dark:border-amber-500/50 dark:text-amber-400 font-bold'
     : isReasoning
     ? 'bg-purple-500/15 border-purple-500/40 text-purple-700 dark:bg-purple-500/25 dark:border-purple-500/50 dark:text-purple-400 font-bold'
     : 'bg-secondary/25 border-secondary/50 text-secondary dark:text-secondary font-bold';
 
-  const suggestionBoxClass = isLocation
+  const suggestionBoxClass = isTimeline || isLocation
     ? 'bg-rose-500/10 border-rose-500/30 dark:bg-rose-500/15 dark:border-rose-500/40'
-    : isKnowledge || isObject
+    : isWorldRule
+    ? 'bg-teal-500/10 border-teal-500/30 dark:bg-teal-500/15 dark:border-teal-500/40'
+    : isKnowledge
+    ? 'bg-blue-500/10 border-blue-500/30 dark:bg-blue-500/15 dark:border-blue-500/40'
+    : isEvent || isObject
     ? 'bg-amber-500/10 border-amber-500/30 dark:bg-amber-500/15 dark:border-amber-500/40'
     : isReasoning
     ? 'bg-purple-500/10 border-purple-500/30 dark:bg-purple-500/15 dark:border-purple-500/40'
