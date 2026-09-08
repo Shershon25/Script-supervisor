@@ -117,27 +117,7 @@ Past review decisions are retrieved during future analysis so the system can res
 
 ## ⚙️ How It Works
 
-```
-Writer writes or imports screenplay
-            ↓
-Scene-by-scene analysis (Gemini)
-  → Entities, facts, events, relationships, character knowledge
-  → Real-world claims identified and classified
-            ↓
-Story memory stored in CockroachDB
-            ↓
-Hybrid retrieval for continuity checking
-  → SQL queries for relevant prior facts, events, knowledge
-  → Writer decisions and world rules included in context
-            ↓
-Gemini evaluates candidate conflicts
-  → Findings with evidence and confidence score
-            ↓
-Real-world claims → Parallel web search → Gemini evaluates sources
-            ↓
-Writer reviews findings (Accept / Resolve / Ignore / Reopen)
-  → Decisions stored and retrieved in future analysis
-```
+![Script Supervisor Overall Flow](assets/Script%20Supervisor-Overall%20flow.png)
 
 ---
 
@@ -145,32 +125,7 @@ Writer reviews findings (Accept / Resolve / Ignore / Reopen)
 
 ### Technology Stack & Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Writer's Browser                            │
-│          Next.js 14 / React / TypeScript (Vercel)               │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ REST API (JWT)
-                            ▼
-┌────────────────────────────────────────────────────────────────┐
-│                FastAPI Backend (Google Cloud Run)              │
-│           Python 3.10 · Uvicorn · SQLAlchemy · Alembic         │
-│                                                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │  Scene       │  │  Retriever   │  │  Research Service    │  │
-│  │  Processor   │  │  (SQL +      │  │  (Claims → Parallel  │  │
-│  │  (Gemini)    │  │  Keyword)    │  │   → Gemini Eval)     │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                     │              │
-└─────────┼─────────────────┼─────────────────────┼──────────────┘
-          │                 │                     │
-          ▼                 ▼                     ▼
-┌──────────────────┐  ┌───────────────┐  ┌──────────────────────┐
-│   Gemini API     │  │  CockroachDB  │  │    Parallel API      │
-│ (Vertex AI or    │  │  (All story   │  │  (Live web search    │
-│  Developer API)  │  │   state)      │  │   for fact-checking) │
-└──────────────────┘  └───────────────┘  └──────────────────────┘
-```
+![Script Supervisor Architecture Diagram](assets/Script%20Supervisor-%20Architecture%20diagram.png)
 
 ### Component Responsibilities
 
@@ -196,27 +151,7 @@ Parallel is the web research backbone of the reality-checking system. When a scr
 
 Here is exactly how Parallel is used ([`research_service.py`](backend/app/services/research_service.py), [`parallel.py`](backend/app/services/parallel.py)):
 
-```
-1. Gemini analyzes the scene and classifies each claim:
-   REAL_WORLD_CLAIM / FICTIONAL_WORLD_RULE / STORY_FACT
-           ↓
-2. For each REAL_WORLD_CLAIM flagged for research,
-   the backend formulates a targeted objective, e.g:
-   "Determine whether 'Mumbai Central opened in 1930' is factually accurate."
-           ↓
-3. execute_parallel_search(objective)
-   → POST https://api.parallel.ai/v1/search
-   → Returns sources: title, URL, domain, excerpt, relevance score
-           ↓
-4. Sources are persisted in CockroachDB (ResearchResult records)
-           ↓
-5. Gemini receives the sources inside <UNTRUSTED_RESEARCH_EVIDENCE> delimiters
-   and evaluates them against the claim
-   → Returns: verdict, confidence, reasoning, supporting/contradicting source IDs
-           ↓
-6. Verdict and evaluation stored (ResearchEvaluation record)
-   Claim status updated: VERIFIED / LIKELY_TRUE / CONTRADICTED / INCONCLUSIVE
-```
+![Parallel Search API in Script Supervisor](assets/Parallel%20Search%20API%20in%20Script%20Supervisor.png)
 
 **Parallel retrieves sources — Gemini decides the verdict.** The evaluation is always grounded in real web evidence with source URLs the writer can inspect, not inference from training data alone.
 
