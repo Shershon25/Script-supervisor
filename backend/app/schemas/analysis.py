@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -9,8 +9,11 @@ class AttributePair(BaseModel):
     value: str = Field(..., description="Attribute value e.g. doctor, 35")
 
 class EntityExtraction(BaseModel):
-    type: str = Field(..., description="Type of entity: character | location | object | organization")
-    name: str = Field(..., description="Name or canonical title of the entity")
+    type: Literal["character", "location", "object", "organization"] = Field(
+        ..., 
+        description="Strict entity category. 'character' MUST be a specific named human/sentient being (e.g. Maya Reyes, Daniel Kerr). NEVER classify environmental hazards (flood, fire, storm), audio sources (Radio Voice, PA System), locations, or time as character."
+    )
+    name: str = Field(..., description="Canonical full personal name of the character, or name of location/object/organization")
     attributes: List[AttributePair] = Field(default_factory=list, description="Key-value attribute pairs")
 
 class FactExtraction(BaseModel):

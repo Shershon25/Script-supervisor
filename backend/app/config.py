@@ -51,8 +51,12 @@ class Settings(BaseSettings):
     MAX_IMPORTS_PER_IP_PER_DAY: int = 10
 
     # JWT Authentication Configuration
-    JWT_SECRET_KEY: str = "agentic_cinema_secret_key_2026_super_secure_jwt_token_key"
-    JWT_ACCESS_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_SECRET_KEY: str = ""
+    JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = 1
+
+    # Demo User Credentials (Loaded strictly from .env)
+    DEMO_USER_USERNAME: str = ""
+    DEMO_USER_PASSWORD: str = ""
     
     model_config = SettingsConfigDict(
         env_file=str(root_env) if root_env.exists() else ".env",

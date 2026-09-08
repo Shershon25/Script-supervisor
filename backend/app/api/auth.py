@@ -8,8 +8,42 @@ from app.schemas.auth import UserRegisterRequest, UserLoginRequest, UserResponse
 from app.core.security import hash_password, verify_password, create_access_token
 from app.api.deps import get_current_user
 
+from app.config import settings
+
 logger = logging.getLogger("script_supervisor.auth")
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+@router.post("/demo-login", response_model=TokenResponse)
+def demo_login_user(db: Session = Depends(get_db)):
+    """Authenticates or auto-provisions the configured demo user and issues a JWT token."""
+    demo_username = settings.DEMO_USER_USERNAME.strip()
+    demo_password = settings.DEMO_USER_PASSWORD.strip()
+
+    if not demo_username or not demo_password:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Demo user credentials are not configured in environment variables (DEMO_USER_USERNAME / DEMO_USER_PASSWORD)."
+        )
+
+    user = db.query(User).filter(User.username.ilike(demo_username)).first()
+    if not user:
+        # Auto-create demo user if not existing yet
+        user = User(
+            username=demo_username,
+            hashed_password=hash_password(demo_password)
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token({"sub": user.id, "username": user.username})
+    logger.info(f"Demo user '{user.username}' logged in via demo-login endpoint.")
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user)
+    )
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register_user(payload: UserRegisterRequest, db: Session = Depends(get_db)):

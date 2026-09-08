@@ -33,7 +33,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     if expires_delta:
         expire = now + expires_delta
     else:
-        expire = now + timedelta(days=settings.JWT_ACCESS_TOKEN_EXPIRE_DAYS)
+        expire = now + timedelta(hours=settings.JWT_ACCESS_TOKEN_EXPIRE_HOURS)
     
     to_encode.update({
         "exp": int(expire.timestamp()),

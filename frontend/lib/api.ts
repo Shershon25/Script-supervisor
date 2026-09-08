@@ -351,6 +351,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
+      window.dispatchEvent(new Event('auth:unauthorized'));
     }
   }
   if (!response.ok) {
@@ -396,6 +397,13 @@ export async function loginUser(username: string, password: string): Promise<Tok
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
+  });
+  return handleResponse<TokenResponse>(res);
+}
+
+export async function demoLoginUser(): Promise<TokenResponse> {
+  const res = await fetch(`${API_URL}/api/auth/demo-login`, {
+    method: 'POST',
   });
   return handleResponse<TokenResponse>(res);
 }

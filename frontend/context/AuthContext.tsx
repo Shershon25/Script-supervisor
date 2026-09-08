@@ -1,13 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, getAuthUser, loginUser, registerUser } from '@/lib/api';
+import { User, getAuthUser, loginUser, demoLoginUser, registerUser } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  demoLogin: () => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   token: null,
   loading: true,
   login: async () => {},
+  demoLogin: async () => {},
   register: async () => {},
   logout: () => {},
 });
@@ -44,10 +46,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
     initAuth();
+
+    const handleUnauthorized = () => {
+      setToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {
     const res = await loginUser(username, password);
+    localStorage.setItem('access_token', res.access_token);
+    setToken(res.access_token);
+    setUser(res.user);
+  };
+
+  const demoLogin = async () => {
+    const res = await demoLoginUser();
     localStorage.setItem('access_token', res.access_token);
     setToken(res.access_token);
     setUser(res.user);
@@ -67,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, demoLogin, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

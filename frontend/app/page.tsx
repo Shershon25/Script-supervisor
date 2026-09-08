@@ -18,11 +18,11 @@ import { SettingsView } from '@/components/Settings/SettingsView';
 import { ToastProvider, useToast } from '@/components/UI/Toast';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import AuthModal from '@/components/Auth/AuthModal';
-import { Film, FolderPlus, LogIn, FileText, Plus } from 'lucide-react';
+import { Film, FolderPlus, LogIn, FileText, Plus, User } from 'lucide-react';
 
 function HomeContent() {
   const toast = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, login, demoLogin, loading: authLoading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -461,13 +461,27 @@ function HomeContent() {
               </p>
             </div>
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-border space-y-2.5">
               <button
                 onClick={() => setShowAuthModal(true)}
                 className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Log In / Sign Up</span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await demoLogin();
+                  } catch (err: any) {
+                    toast.error(err.message || 'Demo login failed');
+                  }
+                }}
+                className="w-full py-2.5 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2"
+              >
+                <User className="w-4 h-4" />
+                <span>Login as Demo User</span>
               </button>
             </div>
           </div>
