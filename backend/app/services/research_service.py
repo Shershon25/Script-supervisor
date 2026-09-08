@@ -128,7 +128,9 @@ DO NOT mark these for research:
 EXTRACTION & DEDUPLICATION RULES
 
 - EXTRACT AT MOST ONE CANONICAL CLAIM PER DISTINCT FACTUAL ASSERTION.
-- STRICTLY DO NOT OUTPUT DUPLICATE OR NEAR-DUPLICATE REPHRASINGS OF THE SAME UNDERLYING ASSERTION (e.g. ❌ NEVER output both "The first train to Chicago ran in 1954" AND "The first train to Chicago was in 1954"). Pick ONE clean, normalized canonical declarative sentence.
+- NO QUOTE DUPLICATION: When a dialogue line asserts a factual claim, output ONLY ONE single declarative sentence in `claim_text`. Never output both a raw quote fragment (e.g. "The first train to Chicago was in 1954") and a synthesized claim statement (e.g. "The first train to Chicago ran in 1954") for the same dialogue line. Pick ONE clean, canonical declarative sentence.
+- STRICTLY DO NOT OUTPUT DUPLICATE OR NEAR-DUPLICATE REPHRASINGS OF THE SAME UNDERLYING ASSERTION.
+- CONSOLIDATE FICTIONAL WORLD RULES: Synthesize complementary dialogue lines or statements describing the same fictional mechanism into a SINGLE consolidated FICTIONAL_WORLD_RULE entry (e.g. if dialogue says "The field didn't move us through time" AND "The field moved time around us", consolidate into ONE rule: "The field moves time around objects rather than moving objects through time").
 - If dialogue or action asserts a factual claim multiple times or in different words within the scene, synthesize them into a SINGLE canonical claim entry.
 - Extract only claims actually supported by the scene.
 - Do not invent missing facts.
@@ -580,10 +582,19 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
 
         fingerprint = compute_claim_fingerprint(project_id, ext.claim_text, ext.temporal_context, ext.location_context)
 
+        # Check existing claim by fingerprint OR by structured (scene_id, subject, object) match
         existing = db.query(Claim).filter(
             Claim.project_id == project_id,
             Claim.claim_fingerprint == fingerprint
         ).first()
+
+        if not existing and ext.subject and ext.object:
+            existing = db.query(Claim).filter(
+                Claim.project_id == project_id,
+                Claim.scene_id == scene.id,
+                Claim.subject == ext.subject,
+                Claim.object == ext.object
+            ).first()
 
         if existing:
             scene_num = db.query(Scene.scene_number).filter(Scene.id == existing.scene_id).scalar()

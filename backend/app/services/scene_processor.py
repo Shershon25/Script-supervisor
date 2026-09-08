@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
-from app.db.models import Project, Scene, Entity, Fact, Event, Relationship, KnowledgeState
+from app.db.models import Project, Scene, Entity, Fact, Event, Relationship, KnowledgeState, Claim, Issue
 from app.services.gemini import analyze_scene
 from app.services.story_state import build_story_state
 from app.services.continuity import check_scene_continuity

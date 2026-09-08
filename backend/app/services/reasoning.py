@@ -222,6 +222,13 @@ def execute_targeted_reasoning(
                 from app.services.issue_review import compute_issue_fingerprint
                 from app.schemas.issue import IssueEvidence
 
+                # Purge previous open reasoning issues for this scene before persisting fresh findings
+                db.query(Issue).filter(
+                    Issue.scene_id == scene.id,
+                    Issue.issue_type.in_(["REASONING_CONFLICT", "OBJECT_STATE_CONFLICT", "EVENT_CONFLICT"]),
+                    Issue.status == "OPEN"
+                ).delete()
+
                 for f in parsed_findings:
                     v = f.get("classification", "").upper()
                     if v in ("CONFLICT", "AMBIGUOUS"):
