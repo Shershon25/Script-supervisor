@@ -23,6 +23,12 @@ function getSuggestionText(issue: IssueResponse): string {
   if (issue.issue_type.includes('OBJECT') || issue.issue_type.includes('OWNERSHIP')) {
     return `Add an object transfer event (give/take) or update item possession details.`;
   }
+  if (issue.issue_type.includes('TIMELINE')) {
+    return `Align timestamps across scenes or mark as an intentional temporal anomaly / Story World Rule.`;
+  }
+  if (issue.issue_type.includes('WORLD_RULE')) {
+    return `Review fictional physics claim. If intentional, mark as 'Intentional' so the AI adds it as a World Rule and respects it in downstream scenes.`;
+  }
   if (issue.issue_type.includes('REASONING') || issue.issue_type.includes('OBJECT_STATE')) {
     return `Review narrative continuity for ${issue.title.toLowerCase()}. If intentional, mark as a story decision so the AI does not re-flag it.`;
   }
@@ -37,6 +43,8 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
 
   const isKnowledge = issue.issue_type.includes('KNOWLEDGE');
   const isLocation = issue.issue_type.includes('LOCATION');
+  const isTimeline = issue.issue_type.includes('TIMELINE');
+  const isWorldRule = issue.issue_type.includes('WORLD_RULE');
   const isObject = issue.issue_type.includes('OBJECT') || issue.issue_type.includes('OWNERSHIP');
   const isReasoning = issue.issue_type.includes('REASONING') || issue.issue_type === 'OBJECT_STATE_CONFLICT';
   const isProcedure = issue.issue_type.includes('REALITY') || issue.title.includes('Procedure') || issue.issue_type.includes('RESEARCH');
@@ -135,6 +143,10 @@ export default function FindingCard({ issue, onSelectSceneNumber, onReview }: Pr
               ? 'Knowledge Gap'
               : isLocation
               ? 'Location Conflict'
+              : isTimeline
+              ? 'Timeline Inconsistency'
+              : isWorldRule
+              ? 'Potential World Rule'
               : isObject
               ? 'Object Transfer'
               : isReasoning

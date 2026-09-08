@@ -109,6 +109,23 @@ def review_issue(db: Session, project_id: str, issue_id: str, review_in: IssueRe
         if review_in.note:
             issue.resolution_note = review_in.note.strip()
 
+        # 3. If writer marks as ACCEPT / INTENTIONAL, register as an active Story World Rule
+        if action == "ACCEPT" and (issue.resolution_type == "INTENTIONAL" or (review_in.resolution_type and review_in.resolution_type.upper() == "INTENTIONAL")):
+            from app.db.models import StoryWorldRule
+            rule_text = issue.title if len(issue.title) > 10 else issue.description[:200]
+            existing_rule = db.query(StoryWorldRule).filter(
+                StoryWorldRule.project_id == project_id,
+                StoryWorldRule.rule_text == rule_text
+            ).first()
+            if not existing_rule:
+                new_rule = StoryWorldRule(
+                    project_id=project_id,
+                    rule_text=rule_text,
+                    active=True
+                )
+                db.add(new_rule)
+                logger.info(f"Automatically registered active StoryWorldRule '{rule_text}' from writer review decision.")
+
         db.commit()
         db.refresh(issue)
         db.refresh(review_record)

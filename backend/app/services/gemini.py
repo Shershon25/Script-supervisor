@@ -250,7 +250,8 @@ Assign Confidence:
 
 ## 3. CONFLICT-SPECIFIC GUIDANCE
 
-- Character / Location: Could the character reasonably have moved between these scenes? Do not assume they remained in the previous location.
+- Character / Location: Could the character reasonably have moved between these scenes? Do not assume they remained in the previous location. If dialogue explicitly denies presence ("We never stopped here"), classify as LOCATION_CONFLICT or AMBIGUOUS (WARNING).
+- Contradictory Dialogue / Memory: When a character's dialogue contradicts established events or another character's memory ("You two were here an hour ago" vs "We never stopped here"), classify as EVENT_CONFLICT or AMBIGUOUS (WARNING). Do NOT classify as NO_CONFLICT merely because the contradiction occurs in dialogue.
 - Object Location: Was there an event that could have moved, transferred, hidden, or changed the object?
 - Ownership: Did ownership actually change, or is the current scene only showing physical possession/use?
 - Relationships: Is this genuinely incompatible with the earlier relationship, or could the relationship have evolved?

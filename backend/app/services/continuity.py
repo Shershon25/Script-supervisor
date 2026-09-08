@@ -351,11 +351,49 @@ def generate_candidates_for_scene(
                     f"recovery, transfer, or acquisition event."
                 )
             ))
-            logger.info(
-                f"[CROSS-SCENE STATE] Scene #{scene.scene_number}: "
-                f"Nominated OBJECT_STATE_CONFLICT candidate for '{obj_name}' "
-                f"(last ABSENT in Sc.{last_snum}) — sending to Gemini for evaluation."
-            )
+    # 7. Timeline Inconsistency Candidate Generation
+    # Scans current scene raw text, facts, and events for timestamps (e.g. 11:42 PM, 7:12 P.M., 6:55 P.M., 1954).
+    # Compares against prior scenes' timestamps to detect regressions or incompatible event timing.
+    import re
+    TIME_PATTERN = re.compile(r'\b(?:1[0-2]|0?[1-9]):[0-5][0-9]\s*(?:a\.?m\.?|p\.?m\.?|AM|PM)?\b|\b(?:19|20)\d{2}\b', re.IGNORECASE)
+
+    curr_facts_text = " ".join([f"{f.predicate} {f.value}" for f in current_facts])
+    curr_events_text = " ".join([f"{ev.event_type} {ev.description}" for ev in current_events])
+    curr_full_text = (scene.raw_text or "") + " " + curr_facts_text + " " + curr_events_text
+
+    curr_time_matches = TIME_PATTERN.findall(curr_full_text)
+    if curr_time_matches:
+        prior_facts_events = db.execute(text("""
+            SELECT s.scene_number, s.id as scene_id, f.value as text_content
+            FROM facts f
+            JOIN scenes s ON f.scene_id = s.id
+            WHERE s.project_id = :pid AND s.scene_number < :csn
+            UNION ALL
+            SELECT s.scene_number, s.id as scene_id, ev.description as text_content
+            FROM events ev
+            JOIN scenes s ON ev.scene_id = s.id
+            WHERE s.project_id = :pid AND s.scene_number < :csn
+        """), {"pid": project_id, "csn": scene.scene_number}).fetchall()
+
+        for p_row in prior_facts_events:
+            p_text = p_row.text_content or ""
+            p_time_matches = TIME_PATTERN.findall(p_text)
+            if p_time_matches:
+                cand_id = f"cand_timeline_sc{scene.scene_number}_{p_row.scene_number}"
+                candidates.append(ContinuityCandidate(
+                    id=cand_id,
+                    issue_type="TIMELINE_CONFLICT",
+                    entity_name="Timeline",
+                    current_scene_id=scene.id,
+                    current_scene_number=scene.scene_number,
+                    current_text=f"Scene {scene.scene_number} timestamp/time reference: \"{(curr_facts_text or scene.raw_text)[:120]}\"",
+                    previous_scene_id=p_row.scene_id,
+                    previous_scene_number=p_row.scene_number,
+                    previous_text=f"Scene {p_row.scene_number} established time reference: \"{p_text[:120]}\"",
+                    reason=f"The established timing of the experiment or event in Scene {p_row.scene_number} conflicts with the timestamp or time reference given in Scene {scene.scene_number}."
+                ))
+                logger.info(f"[TIMELINE] Scene #{scene.scene_number}: Nominated TIMELINE_CONFLICT candidate against Scene #{p_row.scene_number}.")
+                break
 
     return candidates
 

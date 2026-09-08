@@ -541,6 +541,34 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
             ext.claim_type = "FICTIONAL_WORLD_RULE"
             ext.requires_research = False
             ext.reason = "Matches active user-authored Story World Rule"
+        elif ext.claim_type == "FICTIONAL_WORLD_RULE":
+            from app.db.models import Issue
+            from app.services.issue_review import compute_issue_fingerprint
+            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", ext.claim_text[:50], [scene.scene_number])
+            existing_issue = db.query(Issue).filter(
+                Issue.project_id == project_id,
+                Issue.issue_fingerprint == rule_fingerprint
+            ).first()
+            if not existing_issue:
+                issue_obj = Issue(
+                    project_id=project_id,
+                    scene_id=scene.id,
+                    issue_type="WORLD_RULE_CANDIDATE",
+                    severity="INFO",
+                    title=f"Fictional World Rule Candidate: '{ext.claim_text[:60]}'",
+                    description=f"The screenplay establishes a fictional physics/universe behavior: \"{ext.claim_text}\". Click 'Intentional' if this is an intended universe rule.",
+                    confidence=0.88,
+                    status="OPEN",
+                    evidence_json=[{
+                        "scene_id": scene.id,
+                        "scene_number": scene.scene_number,
+                        "type": "NEW_SCENE_STATE",
+                        "text": f"Sc. {scene.scene_number}: {ext.claim_text}"
+                    }],
+                    issue_fingerprint=rule_fingerprint
+                )
+                db.add(issue_obj)
+                logger.info(f"Created WORLD_RULE_CANDIDATE issue for claim '{ext.claim_text[:50]}'")
 
         # Apply Reality Level constraints (0 = Pure Fantasy, 10 = Strict Documentary)
         if reality_lvl == 0:
