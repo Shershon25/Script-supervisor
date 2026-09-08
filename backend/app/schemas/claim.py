@@ -11,6 +11,9 @@ class ClaimExtraction(BaseModel):
     temporal_context: Optional[str] = None
     location_context: Optional[str] = None
     requires_research: bool = Field(default=False)
+    matches_active_world_rule: bool = Field(default=False, description="True if claim is subsumed by an active user-authored Story World Rule")
+    matched_rule_text: Optional[str] = Field(default=None, description="Exact text of active Story World Rule that covers this claim")
+    reason: Optional[str] = Field(default=None, description="Explanation of why this classification was chosen")
     research_priority: str = Field(default="MEDIUM", description="HIGH | MEDIUM | LOW")
 
     @model_validator(mode='before')

@@ -430,22 +430,7 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
     # 3. Stage 1: Candidate Generation
     candidates = generate_candidates_for_scene(db, project_id, scene, prior_story_state)
     
-    # Filter candidates if they match active world rules
-    filtered_candidates = []
-    for cand in candidates:
-        matched_rule = False
-        for rule in active_world_rules:
-            # If candidate text or entity matches active world rule, candidate is permitted by fictional physics
-            rule_words = [w.lower() for w in rule.rule_text.split() if len(w) > 3]
-            cand_words = (cand.current_text + " " + cand.reason).lower()
-            if len(rule_words) > 0 and sum(1 for w in rule_words if w in cand_words) >= max(1, len(rule_words) // 2):
-                matched_rule = True
-                logger.info(f"Candidate {cand.id} permitted by Story World Rule: '{rule.rule_text}'")
-                break
-        if not matched_rule:
-            filtered_candidates.append(cand)
-
-    candidates = filtered_candidates
+    # Candidate list is passed to Gemini evaluation along with active World Rules retrieved via hybrid context
     cand_summary = {}
     for c in candidates:
         cand_summary[c.issue_type] = cand_summary.get(c.issue_type, 0) + 1
@@ -547,7 +532,6 @@ def check_scene_continuity(db: Session, project_id: str, scene_id: str) -> List[
             severity=computed_severity,
             title=ev.title,
             description=ev.description,
-
             confidence=ev.confidence,
             status="OPEN",
             evidence_json=[e.model_dump() for e in evidence_list],

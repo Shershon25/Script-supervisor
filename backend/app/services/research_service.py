@@ -132,6 +132,7 @@ EXTRACTION & DEDUPLICATION RULES
 - NO QUOTE DUPLICATION: When a dialogue line asserts a factual claim, output ONLY ONE single declarative sentence in `claim_text`. Never output both a raw quote fragment (e.g. "The first train to Chicago was in 1954") and a synthesized claim statement (e.g. "The first train to Chicago ran in 1954") for the same dialogue line. Pick ONE clean, canonical declarative sentence.
 - STRICTLY DO NOT OUTPUT DUPLICATE OR NEAR-DUPLICATE REPHRASINGS OF THE SAME UNDERLYING ASSERTION.
 - CONSOLIDATE FICTIONAL WORLD RULES: Synthesize complementary dialogue lines or statements describing the same fictional mechanism into a SINGLE consolidated FICTIONAL_WORLD_RULE entry (e.g. if dialogue says "The field didn't move us through time" AND "The field moved time around us", consolidate into ONE rule: "The field moves time around objects rather than moving objects through time").
+- ACTIVE STORY WORLD RULES & SEMANTIC SUBSUMPTION: Check each extracted claim against any provided ACTIVE STORY WORLD RULES. If an extracted claim's mechanism or assertion falls within the scope/concept of an active world rule (e.g., "The sphere emits a stable temporal field" or "The field moved time around us" is subsumed by an active rule describing temporal field behavior), set `matches_active_world_rule: true` AND set `matched_rule_text` to the exact text of that active world rule. Otherwise, set `matches_active_world_rule: false` and `matched_rule_text: null`.
 - If dialogue or action asserts a factual claim multiple times or in different words within the scene, synthesize them into a SINGLE canonical claim entry.
 - Extract only claims actually supported by the scene.
 - Do not invent missing facts.
@@ -151,6 +152,8 @@ Return valid JSON only:
       "claim_text": "string",
       "claim_type": "STORY_FACT|REAL_WORLD_CLAIM|FICTIONAL_WORLD_RULE",
       "requires_research": true,
+      "matches_active_world_rule": false,
+      "matched_rule_text": "string|null",
       "subject": "string|null",
       "predicate": "string|null",
       "object": "string|null",
@@ -353,8 +356,8 @@ def evaluate_evidence_gemini(claim_text: str, sources: List[ResearchResult]) -> 
         )
 
 
-def extract_claims_from_scene(scene_text: str) -> List[ClaimExtraction]:
-    """Extracts claims using Gemini API."""
+def extract_claims_from_scene(scene_text: str, active_rules: Optional[List[Any]] = None) -> List[ClaimExtraction]:
+    """Extracts claims using Gemini API with active world rules context for semantic subsumption."""
     provider = settings.GEMINI_PROVIDER.lower()
 
     try:
@@ -363,8 +366,16 @@ def extract_claims_from_scene(scene_text: str) -> List[ClaimExtraction]:
 
         client = get_genai_client()
 
+        rules_str = "None"
+        if active_rules:
+            rules_str = "\n".join([f"- {r.rule_text}" for r in active_rules])
+
         # We construct JSON array output prompt
-        prompt = f"{CLAIM_EXTRACTION_PROMPT}\n\nSCENE TEXT:\n<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>"
+        prompt = (
+            f"{CLAIM_EXTRACTION_PROMPT}\n\n"
+            f"ACTIVE STORY WORLD RULES:\n<UNTRUSTED_STORY_CONTEXT>\n{rules_str}\n</UNTRUSTED_STORY_CONTEXT>\n\n"
+            f"SCENE TEXT:\n<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>"
+        )
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.1
@@ -529,27 +540,66 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
     reality_lvl = settings_obj.reality_level # 0 to 10
     active_rules = get_active_world_rules(db, project_id)
 
-    extracted = extract_claims_from_scene(scene.raw_text)
+    extracted = extract_claims_from_scene(scene.raw_text, active_rules=active_rules)
     persisted_claims: List[ClaimResponse] = []
 
     for ext in extracted:
-        # Check if claim matches any active Story World Rule
-        matched_rule = False
-        for r in active_rules:
-            rule_words = [w.lower() for w in r.rule_text.split() if len(w) > 3]
-            claim_words = (ext.claim_text + " " + (ext.subject or "") + " " + (ext.object or "")).lower()
-            if len(rule_words) > 0 and sum(1 for w in rule_words if w in claim_words) >= max(1, len(rule_words) // 2):
-                matched_rule = True
-                break
+        # Rely on Gemini's semantic subsumption output (ext.matches_active_world_rule)
+        matched_rule = ext.matches_active_world_rule
 
         if matched_rule:
             ext.claim_type = "FICTIONAL_WORLD_RULE"
             ext.requires_research = False
             ext.reason = "Matches active user-authored Story World Rule"
+            
+            # Format resolution note with matched world rule text if available
+            note_str = f"Matches active Story World Rule: \"{ext.matched_rule_text}\"" if ext.matched_rule_text else "Matches active user-authored Story World Rule"
+
+            # Compute unique fingerprint per distinct claim text
+            from app.db.models import Issue
+            from app.services.issue_review import compute_issue_fingerprint
+            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", ext.claim_text[:60], [scene.scene_number])
+            
+            existing_issue = db.query(Issue).filter(
+                Issue.project_id == project_id,
+                Issue.issue_fingerprint == rule_fingerprint
+            ).first()
+            
+            if not existing_issue:
+                issue_obj = Issue(
+                    project_id=project_id,
+                    scene_id=scene.id,
+                    issue_type="WORLD_RULE_CANDIDATE",
+                    severity="INFO",
+                    title=f"Fictional World Rule: '{ext.claim_text[:60]}'",
+                    description=f"The screenplay establishes a fictional physics/universe behavior: \"{ext.claim_text}\". Auto-accepted based on active Story World Rule.",
+                    confidence=0.95,
+                    status="ACCEPTED",
+                    resolution_type="INTENTIONAL",
+                    resolution_note=note_str,
+                    reviewed_at=utc_now(),
+                    reviewed_by="system_world_rule",
+                    evidence_json=[{
+                        "scene_id": scene.id,
+                        "scene_number": scene.scene_number,
+                        "type": "NEW_SCENE_STATE",
+                        "text": f"Sc. {scene.scene_number}: {ext.claim_text}"
+                    }],
+                    issue_fingerprint=rule_fingerprint
+                )
+                db.add(issue_obj)
+                logger.info(f"Created ACCEPTED/INTENTIONAL WORLD_RULE_CANDIDATE issue for scene #{scene.scene_number}: '{ext.claim_text[:30]}'")
+            else:
+                existing_issue.status = "ACCEPTED"
+                existing_issue.resolution_type = "INTENTIONAL"
+                existing_issue.resolution_note = note_str
+                existing_issue.reviewed_at = utc_now()
+                existing_issue.reviewed_by = "system_world_rule"
+                logger.info(f"Updated existing WORLD_RULE_CANDIDATE issue {existing_issue.id} to ACCEPTED/INTENTIONAL for scene #{scene.scene_number}")
         elif ext.claim_type == "FICTIONAL_WORLD_RULE":
             from app.db.models import Issue
             from app.services.issue_review import compute_issue_fingerprint
-            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", f"scene_{scene.scene_number}_world_rule", [scene.scene_number])
+            rule_fingerprint = compute_issue_fingerprint(project_id, "WORLD_RULE_CANDIDATE", ext.claim_text[:60], [scene.scene_number])
             existing_issue = db.query(Issue).filter(
                 Issue.project_id == project_id,
                 Issue.issue_fingerprint == rule_fingerprint
@@ -573,7 +623,7 @@ def process_scene_claims(db: Session, project_id: str, scene: Scene) -> List[Cla
                     issue_fingerprint=rule_fingerprint
                 )
                 db.add(issue_obj)
-                logger.info(f"Created WORLD_RULE_CANDIDATE issue for scene #{scene.scene_number}")
+                logger.info(f"Created WORLD_RULE_CANDIDATE issue for scene #{scene.scene_number}: '{ext.claim_text[:30]}'")
 
         # Apply Reality Level constraints (0 = Pure Fantasy, 10 = Strict Documentary)
         if reality_lvl == 0:
