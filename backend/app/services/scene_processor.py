@@ -110,6 +110,13 @@ def process_scene(db: Session, project_id: str, scene_number: int, raw_text: str
         if existing_scene:
             scene = existing_scene
             scene.raw_text = raw_text
+            logger.info(f"Purging stale extracted facts, events, claims, and open issues for scene #{scene_number} prior to re-analysis...")
+            db.query(Fact).filter(Fact.scene_id == scene.id).delete()
+            db.query(Event).filter(Event.scene_id == scene.id).delete()
+            db.query(Relationship).filter(Relationship.scene_id == scene.id).delete()
+            db.query(KnowledgeState).filter(KnowledgeState.source_scene_id == scene.id).delete()
+            db.query(Claim).filter(Claim.scene_id == scene.id).delete()
+            db.query(Issue).filter(Issue.scene_id == scene.id, Issue.status == "OPEN").delete()
         else:
             scene = Scene(
                 project_id=project_id,
