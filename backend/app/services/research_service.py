@@ -125,13 +125,15 @@ DO NOT mark these for research:
 - statements that cannot be meaningfully verified
 - generic descriptions that do not make a factual external claim
 
-EXTRACTION RULES
+EXTRACTION & DEDUPLICATION RULES
 
+- EXTRACT AT MOST ONE CANONICAL CLAIM PER DISTINCT FACTUAL ASSERTION.
+- STRICTLY DO NOT OUTPUT DUPLICATE OR NEAR-DUPLICATE REPHRASINGS OF THE SAME UNDERLYING ASSERTION (e.g. ❌ NEVER output both "The first train to Chicago ran in 1954" AND "The first train to Chicago was in 1954"). Pick ONE clean, normalized canonical declarative sentence.
+- If dialogue or action asserts a factual claim multiple times or in different words within the scene, synthesize them into a SINGLE canonical claim entry.
 - Extract only claims actually supported by the scene.
 - Do not invent missing facts.
-- Preserve the original claim text.
 - Prefer precision over completeness.
-- Do not split one factual assertion into unnecessary claims.
+- Do not split one factual assertion into unnecessary multiple claims.
 - A character saying something does not make it objectively true; classify the asserted content, not whether the character is correct.
 - If a statement is ambiguous between fictional story information and an external factual assertion, prefer STORY_FACT unless the scene clearly relies on external reality.
 - When in doubt about whether research is needed, use requires_research = false.
