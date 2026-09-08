@@ -509,8 +509,10 @@ def analyze_scene(scene_text: str) -> SceneAnalysisResponse:
 
         prompt_content = f"<UNTRUSTED_SCREENPLAY_CONTENT>\n{scene_text}\n</UNTRUSTED_SCREENPLAY_CONTENT>"
 
+        extraction_model = getattr(settings, "GEMINI_EXTRACTION_MODEL", None) or settings.GEMINI_MODEL
+
         response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
+            model=extraction_model,
             contents=prompt_content,
             config=config,
         )

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Gemini Developer API settings
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_EXTRACTION_MODEL: str = "gemini-2.5-flash"
     
     # Parallel API settings (External Research)
     PARALLEL_API_KEY: str = ""
