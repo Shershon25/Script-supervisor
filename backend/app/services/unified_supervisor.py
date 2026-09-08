@@ -27,15 +27,23 @@ def process_scene_unified(db: Session, project_id: str, scene_id: str, clear_pro
     if clear_project_entities:
         logger.info(f"[UNIFIED PIPELINE] Purging all existing entities and stale analysis data for project '{project_id}' prior to full project analysis...")
         from app.db.models import Fact, Event, Relationship, KnowledgeState, Issue, IssueReview, Claim, ResearchTask, PlotEvent, Entity
+
+        entity_ids = [e[0] for e in db.query(Entity.id).filter(Entity.project_id == project_id).all()]
+
         db.query(IssueReview).filter(IssueReview.project_id == project_id).delete(synchronize_session=False)
         db.query(Issue).filter(Issue.project_id == project_id).delete(synchronize_session=False)
         db.query(ResearchTask).filter(ResearchTask.project_id == project_id).delete(synchronize_session=False)
         db.query(Claim).filter(Claim.project_id == project_id).delete(synchronize_session=False)
         db.query(Fact).filter(Fact.project_id == project_id).delete(synchronize_session=False)
-        db.query(Event).filter(Event.scene_id.in_(db.query(Scene.id).filter(Scene.project_id == project_id))).delete(synchronize_session=False)
         db.query(Relationship).filter(Relationship.project_id == project_id).delete(synchronize_session=False)
         db.query(KnowledgeState).filter(KnowledgeState.project_id == project_id).delete(synchronize_session=False)
         db.query(PlotEvent).filter(PlotEvent.project_id == project_id).delete(synchronize_session=False)
+
+        if entity_ids:
+            db.query(Event).filter(Event.actor_entity_id.in_(entity_ids)).update({"actor_entity_id": None}, synchronize_session=False)
+            db.query(Event).filter(Event.target_entity_id.in_(entity_ids)).update({"target_entity_id": None}, synchronize_session=False)
+            db.query(Event).filter(Event.location_entity_id.in_(entity_ids)).update({"location_entity_id": None}, synchronize_session=False)
+
         db.query(Entity).filter(Entity.project_id == project_id).delete(synchronize_session=False)
         db.commit()
 
