@@ -1,16 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
-import { StoryStateResponse } from '@/lib/api';
-import { Layers, User, Box, MapPin, BookOpen, Share2, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { StoryStateResponse, StoryWorldRule, getProjectSettings } from '@/lib/api';
+import { Layers, User, Box, MapPin, BookOpen, Share2, Tag, Shield, AlertTriangle } from 'lucide-react';
 
 interface Props {
+  projectId: string;
   storyState: StoryStateResponse | null;
   onSelectSceneNumber?: (sceneNum: number) => void;
 }
 
-export default function CanonMemoryView({ storyState, onSelectSceneNumber }: Props) {
+export default function CanonMemoryView({ projectId, storyState, onSelectSceneNumber }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<'CHARACTERS' | 'LOCATIONS' | 'OBJECTS' | 'RELATIONSHIPS' | 'KNOWLEDGE' | 'WORLD_RULES'>('CHARACTERS');
+  const [worldRules, setWorldRules] = useState<StoryWorldRule[]>([]);
+  const [loadingRules, setLoadingRules] = useState(false);
+
+  // Fetch world rules when the tab is first opened
+  useEffect(() => {
+    if (selectedCategory !== 'WORLD_RULES' || !projectId) return;
+    setLoadingRules(true);
+    getProjectSettings(projectId)
+      .then(settings => setWorldRules(settings.world_rules.filter(r => r.active)))
+      .catch(() => setWorldRules([]))
+      .finally(() => setLoadingRules(false));
+  }, [selectedCategory, projectId]);
 
   if (!storyState) {
     return (
@@ -293,13 +306,35 @@ export default function CanonMemoryView({ storyState, onSelectSceneNumber }: Pro
 
       {/* World Rules */}
       {selectedCategory === 'WORLD_RULES' && (
-        <div className="p-4 rounded-xl bg-tertiary/10 border border-tertiary/30 space-y-2">
-          <h4 className="font-bold text-tertiary text-xs uppercase tracking-wider">
-            Established Fictional World Rules:
-          </h4>
-          <p className="text-xs text-txtPrimary leading-relaxed">
-            Fictional rules established by the writer (e.g. teleportation, sci-fi devices) are protected from external real-world research challenges.
-          </p>
+        <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-0">
+          {loadingRules ? (
+            <div className="flex items-center justify-center py-8 text-txtMuted text-xs gap-2">
+              <Shield className="w-4 h-4 animate-pulse text-tertiary" />
+              <span>Loading world rules...</span>
+            </div>
+          ) : worldRules.length === 0 ? (
+            <div className="p-5 rounded-xl bg-tertiary/10 border border-tertiary/25 space-y-2 text-center">
+              <AlertTriangle className="w-5 h-5 mx-auto text-tertiary" />
+              <p className="text-xs font-semibold text-txtPrimary">No Active World Rules</p>
+              <p className="text-[11px] text-txtMuted leading-relaxed">
+                Define rules for fictional technology, magic systems, or physical laws in{' '}
+                <span className="font-bold text-tertiary">Settings → Story World Rules</span>{' '}
+                to protect them from real-world research challenges.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[11px] text-txtMuted font-mono mb-2">
+                {worldRules.length} active rule{worldRules.length !== 1 ? 's' : ''} — protected from external research challenges
+              </p>
+              {worldRules.map((rule) => (
+                <div key={rule.id} className="p-3 rounded-xl bg-tertiary/10 border border-tertiary/25 flex items-start gap-2.5">
+                  <Shield className="w-3.5 h-3.5 text-tertiary shrink-0 mt-0.5" />
+                  <p className="text-xs text-txtPrimary leading-relaxed">{rule.rule_text}</p>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

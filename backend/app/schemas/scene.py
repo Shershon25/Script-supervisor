@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class SceneCreate(BaseModel):
     scene_number: int = Field(..., gt=0, description="Scene number must be greater than 0")
-    raw_text: str = Field(..., min_length=1, description="Raw screenplay text cannot be empty")
+    raw_text: str = Field(..., min_length=0, description="Raw screenplay text (may be empty for new blank scenes)")
 
 class SceneUpdate(BaseModel):
     raw_text: str = Field(..., min_length=1, description="Raw screenplay text cannot be empty")

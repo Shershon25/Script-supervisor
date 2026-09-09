@@ -248,7 +248,7 @@ export default function SupervisorPanel({
             )}
           </div>
         ) : activeTab === 'memory' ? (
-          <CanonMemoryView storyState={storyState} onSelectSceneNumber={onSelectSceneNumber} />
+          <CanonMemoryView projectId={projectId} storyState={storyState} onSelectSceneNumber={onSelectSceneNumber} />
         ) : (
           <div className="flex-1 overflow-y-auto min-h-0 pr-1">
             <ResearchView

@@ -4,10 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Project, Scene, StoryStateResponse, IssueResponse,
   listProjects, createProject, deleteProject, renameProject, listScenes, getStoryState, listIssues,
-  analyzeScene, analyzeUnifiedScene, reviewIssue, updateSceneText
+  analyzeScene, analyzeUnifiedScene, reviewIssue, updateSceneText, deleteScene, renumberScenes, getSceneAnalysisStatus
 } from '@/lib/api';
 import HeaderNav from '@/components/Layout/HeaderNav';
 import SceneSidebar from '@/components/Scenes/SceneSidebar';
+import DeleteSceneModal from '@/components/Scenes/DeleteSceneModal';
 import ScreenplayPage from '@/components/Editor/ScreenplayPage';
 import SupervisorPanel from '@/components/Supervisor/SupervisorPanel';
 import ReasoningView from '@/components/Reasoning/ReasoningView';
@@ -49,6 +50,10 @@ function HomeContent() {
 
   const [newTitle, setNewTitle] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
+  const [deleteScenePending, setDeleteScenePending] = useState<Scene | null>(null);
+  const [isDeletingScene, setIsDeletingScene] = useState(false);
+  const [backgroundAnalyzingScene, setBackgroundAnalyzingScene] = useState<{ number: number; id: string } | null>(null);
+
 
   useEffect(() => {
     if (user) {
@@ -76,6 +81,39 @@ function HomeContent() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, []);
+
+  // Keep a stable ref to loadProjectData so the polling interval always calls the latest version
+  const loadProjectDataRef = useRef(loadProjectData);
+  useEffect(() => { loadProjectDataRef.current = loadProjectData; });
+
+  // Poll SceneAnalysisRun status every 3s while background analysis is running.
+  // We poll the /analysis endpoint (SceneAnalysisRun) NOT is_analyzed, because:
+  //   - process_scene (step 1 of unified) sets is_analyzed=True mid-pipeline
+  //   - SceneAnalysisRun is only marked COMPLETED after ALL steps finish (including AI reasoning)
+  useEffect(() => {
+    if (!backgroundAnalyzingScene || !activeProject) return;
+
+    const projectId = activeProject.id;
+    const { id: sceneId, number: sceneNumber } = backgroundAnalyzingScene;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await getSceneAnalysisStatus(projectId, sceneId);
+        if (result.status === 'COMPLETED' || result.status === 'PARTIAL') {
+          clearInterval(interval);
+          await loadProjectDataRef.current(projectId);
+          setBackgroundAnalyzingScene(null);
+        } else if (result.status === 'FAILED') {
+          clearInterval(interval);
+          setBackgroundAnalyzingScene(null);
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [backgroundAnalyzingScene?.id, activeProject?.id]);
 
   const currentScene = scenes.find((s) => s.scene_number === activeSceneNumber) || scenes[0];
   const isStale = Boolean(currentScene && analyzedTextMap[currentScene.id] && analyzedTextMap[currentScene.id] !== currentScene.raw_text);
@@ -318,19 +356,88 @@ function HomeContent() {
   const handleAddScene = async () => {
     if (!activeProject) return;
     const nextNum = scenes.length + 1;
-    const defaultText = `INT. SCENE ${nextNum} - DAY\n\nJOHN enters the room.`;
-    setAnalyzing(true);
     try {
-      const res = await analyzeScene(activeProject.id, nextNum, defaultText);
-      await analyzeUnifiedScene(activeProject.id, res.scene.id);
-      await loadProjectData(activeProject.id);
+      // Flush any unsaved draft for the current scene to DB first,
+      // so the background analysis task (which reads from DB) gets the correct content.
+      if (currentScene?.id && pendingDraftsRef.current[currentScene.id]) {
+        await flushPendingSave(activeProject.id, currentScene.id, currentScene.raw_text);
+      }
+
+      // Fast DB-only write — empty text, no Gemini call, no spinner
+      const res = await analyzeScene(activeProject.id, nextNum, '');
+      // Optimistically append blank scene to local state for instant navigation
+      setScenes(prev => [...prev, res.scene]);
       setActiveSceneNumber(nextNum);
+
+      // Show background analysis indicator for scene N-1 (if it has content)
+      if (nextNum > 1 && currentScene?.raw_text?.trim() && currentScene?.id) {
+        setBackgroundAnalyzingScene({ number: nextNum - 1, id: currentScene.id });
+      }
+
+      // Reload in background to sync any DB state (background N-1 analysis, etc.)
+      loadProjectData(activeProject.id);
     } catch (err: any) {
-      alert(err.message || 'Failed to add scene');
-    } finally {
-      setAnalyzing(false);
+      toast.error('Failed to add scene', err.message || 'Could not create new scene');
     }
   };
+
+  /**
+   * Called when user clicks the trash icon on a scene row.
+   * Latest scene: delete directly without a modal.
+   * Mid-script scene: show continuity warning modal first.
+   */
+  const handleDeleteScene = async (scene: Scene) => {
+    if (!activeProject) return;
+    const maxSceneNumber = Math.max(...scenes.map(s => s.scene_number));
+    const isLatest = scene.scene_number === maxSceneNumber;
+
+    if (isLatest) {
+      // Direct delete — no modal needed
+      try {
+        await deleteScene(activeProject.id, scene.id);
+        toast.success('Scene Deleted', `Scene #${scene.scene_number} removed.`);
+        // Navigate to the previous scene (or clear if no scenes left)
+        const remainingScenes = scenes.filter(s => s.id !== scene.id);
+        if (remainingScenes.length > 0) {
+          setActiveSceneNumber(remainingScenes[remainingScenes.length - 1].scene_number);
+        }
+        await loadProjectData(activeProject.id);
+      } catch (err: any) {
+        toast.error('Delete Failed', err.message || 'Could not delete scene');
+      }
+    } else {
+      // Show continuity warning modal
+      setDeleteScenePending(scene);
+    }
+  };
+
+  /**
+   * Confirmed mid-script scene deletion:
+   * 1. Delete scene (cascade clears derived data)
+   * 2. Renumber remaining scenes gap-free + reset is_analyzed
+   * 3. Reload + trigger full batch re-analysis
+   */
+  const handleConfirmDeleteScene = async () => {
+    if (!activeProject || !deleteScenePending) return;
+    setIsDeletingScene(true);
+    try {
+      await deleteScene(activeProject.id, deleteScenePending.id);
+      await renumberScenes(activeProject.id);
+      setDeleteScenePending(null);
+      toast.info('Scene Deleted', `Scene #${deleteScenePending.scene_number} removed. Starting re-analysis...`);
+      // Reload scenes list before kicking off batch analysis
+      await loadProjectData(activeProject.id);
+      setActiveSceneNumber(1);
+      // Trigger full re-analysis to rebuild continuity from scratch
+      await handleAnalyzeAllScenes();
+    } catch (err: any) {
+      toast.error('Delete Failed', err.message || 'Could not delete and renumber scenes');
+    } finally {
+      setIsDeletingScene(false);
+    }
+  };
+
+
 
   const handleReviewIssue = async (
     issueId: string,
@@ -443,6 +550,7 @@ function HomeContent() {
         onStopAnalysis={handleStopAnalysis}
         isStale={isStale}
         saveStatus={saveStatus}
+        backgroundAnalyzingScene={backgroundAnalyzingScene}
         onAnalyzeScene={handleAnalyzeActiveScene}
         onAnalyzeAllScenes={handleAnalyzeAllScenes}
         theme={theme}
@@ -535,6 +643,7 @@ function HomeContent() {
             issues={issues}
             onSelectScene={(s) => handleSelectSceneNumber(s.scene_number)}
             onAddScene={handleAddScene}
+            onDeleteScene={handleDeleteScene}
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
@@ -649,6 +758,17 @@ function HomeContent() {
           <span>Screenplay Format US Letter</span>
         </div>
       </footer>
+
+      {/* Delete Scene Continuity Warning Modal */}
+      {deleteScenePending && (
+        <DeleteSceneModal
+          scene={deleteScenePending}
+          totalScenes={scenes.length}
+          onConfirm={handleConfirmDeleteScene}
+          onCancel={() => setDeleteScenePending(null)}
+          isDeleting={isDeletingScene}
+        />
+      )}
     </div>
   );
 }

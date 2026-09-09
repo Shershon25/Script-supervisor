@@ -480,6 +480,31 @@ export async function updateSceneText(
   return handleResponse<Scene>(res);
 }
 
+export async function deleteScene(
+  projectId: string,
+  sceneId: string
+): Promise<{ status: string; scene_number: number; is_latest: boolean }> {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<{ status: string; scene_number: number; is_latest: boolean }>(res);
+}
+
+export async function renumberScenes(projectId: string): Promise<Scene[]> {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/renumber`, {
+    method: 'POST',
+  });
+  return handleResponse<Scene[]>(res);
+}
+
+export async function getSceneAnalysisStatus(
+  projectId: string,
+  sceneId: string
+): Promise<{ status: string; summary: any }> {
+  const res = await authFetch(`${API_URL}/api/projects/${projectId}/scenes/${sceneId}/analysis`);
+  return handleResponse<{ status: string; summary: any }>(res);
+}
+
 export async function analyzeScene(
   projectId: string,
   sceneNumber: number,

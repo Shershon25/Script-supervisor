@@ -28,6 +28,7 @@ interface Props {
   batchProgress?: { current: number; total: number; currentHeading?: string } | null;
   isStale?: boolean;
   saveStatus?: 'saved' | 'saving' | 'unsaved';
+  backgroundAnalyzingScene?: { number: number; id: string } | null;
   onAnalyzeScene: () => void;
   onAnalyzeAllScenes: () => void;
   onStopAnalysis?: () => void;
@@ -52,6 +53,7 @@ export default function HeaderNav({
   batchProgress,
   isStale,
   saveStatus = 'saved',
+  backgroundAnalyzingScene,
   onAnalyzeScene,
   onAnalyzeAllScenes,
   onStopAnalysis,
@@ -394,6 +396,14 @@ export default function HeaderNav({
               <span className="px-2 py-0.5 rounded-full bg-tertiary/20 border border-tertiary/40 text-tertiary text-[10px] font-mono font-bold animate-pulse flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
                 <span>Stale Text</span>
+              </span>
+            )}
+
+            {/* Background Analysis Progress Badge */}
+            {backgroundAnalyzingScene && !analyzing && (
+              <span className="px-2 py-0.5 rounded-full bg-secondary/15 border border-secondary/30 text-secondary text-[10px] font-mono font-bold animate-pulse flex items-center space-x-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Analyzing Sc. {backgroundAnalyzingScene.number}</span>
               </span>
             )}
 

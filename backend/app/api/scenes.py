@@ -125,3 +125,61 @@ def list_scenes(project_id: str, db: Session = Depends(get_db)):
                 sc.is_analyzed = True
 
     return scenes
+
+
+@router.delete("/{scene_id}")
+def delete_scene(project_id: str, scene_id: str, db: Session = Depends(get_db)):
+    """
+    Deletes a scene and all its derived data (facts, events, relationships,
+    knowledge states, issues, claims, research tasks) via cascade.
+    Returns whether the deleted scene was the latest in the project.
+    """
+    scene = db.query(Scene).filter(Scene.id == scene_id, Scene.project_id == project_id).first()
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found.")
+
+    deleted_scene_number = scene.scene_number
+
+    # Determine if this is the latest scene before deleting
+    from sqlalchemy import func
+    max_scene_number = db.query(func.max(Scene.scene_number))\
+        .filter(Scene.project_id == project_id)\
+        .scalar()
+    is_latest = (deleted_scene_number == max_scene_number)
+
+    db.delete(scene)
+    db.commit()
+
+    return {
+        "status": "deleted",
+        "scene_number": deleted_scene_number,
+        "is_latest": is_latest,
+    }
+
+
+@router.post("/renumber", response_model=List[SceneResponse])
+def renumber_scenes(project_id: str, db: Session = Depends(get_db)):
+    """
+    Compacts scene numbers after a mid-script deletion so there are no gaps
+    (e.g. [1, 2, 4, 5] → [1, 2, 3, 4]).
+    Also resets is_analyzed=False on all scenes so a full batch re-analysis
+    will reprocess everything from scratch with correct numbering.
+    """
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+
+    scenes = db.query(Scene)\
+        .filter(Scene.project_id == project_id)\
+        .order_by(Scene.scene_number.asc())\
+        .all()
+
+    for new_number, scene in enumerate(scenes, start=1):
+        scene.scene_number = new_number
+        scene.is_analyzed = False
+
+    db.commit()
+    for scene in scenes:
+        db.refresh(scene)
+
+    return scenes

@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/png" href="/icon.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
@@ -29,7 +29,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-app text-primary min-h-screen font-sans antialiased selection:bg-accent selection:text-white">
+      <body suppressHydrationWarning className="bg-app text-primary min-h-screen font-sans antialiased selection:bg-accent selection:text-white">
         {children}
       </body>
     </html>

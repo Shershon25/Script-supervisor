@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Scene, IssueResponse } from '@/lib/api';
-import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 interface Props {
   scenes: Scene[];
@@ -10,6 +10,7 @@ interface Props {
   issues?: IssueResponse[];
   onSelectScene: (scene: Scene) => void;
   onAddScene: () => void;
+  onDeleteScene: (scene: Scene) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -20,6 +21,7 @@ export default function SceneSidebar({
   issues = [],
   onSelectScene,
   onAddScene,
+  onDeleteScene,
   collapsed,
   onToggleCollapse
 }: Props) {
@@ -118,31 +120,41 @@ export default function SceneSidebar({
           const hasResearchCheck = sceneIssues.some((i) => i.issue_type.includes('REALITY') || i.issue_type.includes('RESEARCH'));
 
           return (
-            <button
-              key={s.id}
-              onClick={() => onSelectScene(s)}
-              className={`w-full text-left px-2.5 py-2 rounded-lg transition-all flex items-center justify-between ${
-                isActive
-                  ? 'bg-secondary/15 border border-secondary/40 font-bold text-txtPrimary shadow-sm'
-                  : 'hover:bg-cardHover text-txtSecondary'
-              }`}
-            >
-              <div className="flex items-center space-x-2 truncate">
-                <span className={`w-5 text-right font-semibold ${isActive ? 'text-secondary font-bold' : 'text-txtMuted'}`}>
-                  {s.scene_number}
-                </span>
-                <span className="truncate">{slug}</span>
-              </div>
+            <div key={s.id} className="group relative">
+              <button
+                onClick={() => onSelectScene(s)}
+                className={`w-full text-left px-2.5 py-2 rounded-lg transition-all flex items-center justify-between pr-7 ${
+                  isActive
+                    ? 'bg-secondary/15 border border-secondary/40 font-bold text-txtPrimary shadow-sm'
+                    : 'hover:bg-cardHover text-txtSecondary'
+                }`}
+              >
+                <div className="flex items-center space-x-2 truncate">
+                  <span className={`w-5 text-right font-semibold ${isActive ? 'text-secondary font-bold' : 'text-txtMuted'}`}>
+                    {s.scene_number}
+                  </span>
+                  <span className="truncate">{slug}</span>
+                </div>
 
-              {/* Real Issue Indicator Dots */}
-              <div className="flex items-center space-x-1 flex-shrink-0">
-                {!s.is_analyzed && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400/50" title="Not Analyzed Yet" />
-                )}
-                {hasContinuityGap && <span className="w-1.5 h-1.5 rounded-full bg-tertiary" title="Continuity/Knowledge Issue" />}
-                {hasResearchCheck && <span className="w-1.5 h-1.5 rounded-full bg-secondary" title="Reality/Research Check" />}
-              </div>
-            </button>
+                {/* Real Issue Indicator Dots */}
+                <div className="flex items-center space-x-1 flex-shrink-0">
+                  {!s.is_analyzed && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400/50" title="Not Analyzed Yet" />
+                  )}
+                  {hasContinuityGap && <span className="w-1.5 h-1.5 rounded-full bg-tertiary" title="Continuity/Knowledge Issue" />}
+                  {hasResearchCheck && <span className="w-1.5 h-1.5 rounded-full bg-secondary" title="Reality/Research Check" />}
+                </div>
+              </button>
+
+              {/* Trash icon — visible only on row hover */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteScene(s); }}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-txtMuted hover:text-red-500 hover:bg-red-500/10"
+                title={`Delete Scene ${s.scene_number}`}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           );
         })}
       </div>
